@@ -1,5 +1,9 @@
 package com.pavani.pipeline
 
 def BuildDeployPipeline() {
-    echo "Hi This is OK"
+    node {
+        stage('check') {
+            echo "Hi This is OK"
+        }
+    }
 }
