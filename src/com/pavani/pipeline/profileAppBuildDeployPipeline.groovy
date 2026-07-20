@@ -46,7 +46,7 @@ def BuildDeployPipeline() {
 
         stage('Verify images') {
             echo "******** Entering Verify images stage ********"
-            sh 'docker images'
+            sh 'docker images | grep "profile"'
             echo "******** Exiting Verify images stage ********"
         }
     }
