@@ -8,6 +8,17 @@ def BuildDeployPipeline() {
             echo "******** Exiting cleanup stage ********"
         }
 
+        stage('Check Docker') {
+            echo "******** Entering Check Docker stage ********"
+            sh '''
+                docker info >/dev/null 2>&1 || {
+                    echo "Docker is NOT running. Please start Docker Desktop."
+                    exit 1
+                } 
+            '''
+            echo "******** Exiting Check Docker stage ********"
+        }
+
         stage('Checkout') {
             echo "******** Entering Checkout stage ********"
             checkout([
@@ -37,15 +48,6 @@ def BuildDeployPipeline() {
             echo "******** Entering Verify images stage ********"
             sh 'docker images'
             echo "******** Exiting Verify images stage ********"
-        }
-
-        stage('Check Docker') {
-            sh '''
-                docker info >/dev/null 2>&1 || {
-                    echo "Docker is NOT running. Please start Docker Desktop."
-                    exit 1
-                } 
-            '''
         }
     }
 }
