@@ -3,13 +3,13 @@ package com.pavani.pipeline
 def BuildDeployPipeline() {
     node {
         stage('Cleanup') {
-            echo "******** Entering the cleanup stage ********"
+            echo "******** Entering cleanup stage ********"
             deleteDir()
-            echo "******** Existing the cleanup stage ********"
+            echo "******** Exiting cleanup stage ********"
         }
 
         stage('Checkout') {
-            echo "******** Entering the Checkout stage ********"
+            echo "******** Entering Checkout stage ********"
             checkout([
                 $class: 'GitSCM',
                 branches: [[name: '*/main']],
@@ -18,7 +18,25 @@ def BuildDeployPipeline() {
                     credentialsId: 'github-cred'   
                 ]]
             ])
-            echo "******** Existing the Checkout stage ********"
+            echo "******** Exiting Checkout stage ********"
+        }
+
+        stage('Build Frontend') {
+            echo "******** Entering Build Frontend stage ********"
+            sh ' docker build -t profile-frontend:${BUILD_NUMBER} frontend '
+            echo "******** Exiting Build Frontend stage ********"
+        }
+
+        stage('Build Backend') {
+            echo "******** Entering Build Backend stage ********"
+            sh ' docker build -t profile-backend:${BUILD_NUMBER} backend '
+            echo "******** Exiting Build Backend stage ********"
+        }
+
+        stage('Verify images') {
+            echo "******** Entering Verify images stage ********"
+            sh 'docker images'
+            echo "******** Exiting Verify images stage ********"
         }
     }
 }
