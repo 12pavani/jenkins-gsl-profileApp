@@ -38,5 +38,14 @@ def BuildDeployPipeline() {
             sh 'docker images'
             echo "******** Exiting Verify images stage ********"
         }
+
+        stage('Check Docker') {
+            sh '''
+                docker info >/dev/null 2>&1 || {
+                    echo "Docker is NOT running. Please start Docker Desktop."
+                    exit 1
+                } 
+            '''
+        }
     }
 }
