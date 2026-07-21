@@ -49,5 +49,14 @@ def BuildDeployPipeline() {
             sh 'docker images | grep "profile"'
             echo "******** Exiting Verify images stage ********"
         }
+
+        stage('Docker Compose') {
+            echo "******** Entering Docker Compose stage ********"
+            sh '''
+                export BUILD_NUMBER=${BUILD_NUMBER}
+                docker compose -f docker-compose.yaml up
+            '''
+            echo "******** Exiting Docker Compose stage ********"
+        }
     }
 }
