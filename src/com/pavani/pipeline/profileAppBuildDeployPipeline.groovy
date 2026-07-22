@@ -58,5 +58,15 @@ def BuildDeployPipeline() {
             '''
             echo "******** Exiting Docker Compose stage ********"
         }
+
+        stage('Health Check') {
+            echo "******** Entering Health Check stage ********"
+            sh ''' 
+                docker ps
+                curl -f http://localhost:3000 //frontend
+                curl -f http://localhost:8000 //backend
+            '''
+            echo "******** Exiting Health Check stage ********"
+        }
     }
 }
