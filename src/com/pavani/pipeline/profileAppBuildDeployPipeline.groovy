@@ -54,7 +54,7 @@ def BuildDeployPipeline() {
             echo "******** Entering Docker Compose stage ********"
             sh '''
                 export BUILD_NUMBER=${BUILD_NUMBER}
-                docker compose -f docker-compose.yaml up
+                docker compose -d -f docker-compose.yaml up
             '''
             echo "******** Exiting Docker Compose stage ********"
         }
