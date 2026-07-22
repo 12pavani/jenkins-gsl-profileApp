@@ -68,7 +68,7 @@ def BuildDeployPipeline() {
                 # -f is fail silently 
                 curl -f http://localhost:3000 
                 #backend url
-                curl -f http://localhost:8000 
+                curl -f http://localhost:8000/profile
             '''
             echo "******** Exiting Health Check stage ********"
         }
