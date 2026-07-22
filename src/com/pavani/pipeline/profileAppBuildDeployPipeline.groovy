@@ -62,9 +62,13 @@ def BuildDeployPipeline() {
         stage('Health Check') {
             echo "******** Entering Health Check stage ********"
             sh ''' 
+                # list running containers 
                 docker ps
-                curl -f http://localhost:3000 //frontend
-                curl -f http://localhost:8000 //backend
+                #frontend url
+                # -f is fail silently 
+                curl -f http://localhost:3000 
+                #backend url
+                curl -f http://localhost:8000 
             '''
             echo "******** Exiting Health Check stage ********"
         }
