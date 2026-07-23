@@ -68,6 +68,7 @@ def BuildDeployPipeline() {
 
                 sh """
                 export BUILD_NUMBER=${BUILD_NUMBER}
+                docker compose down || true
                 docker compose -f docker-compose.yaml up -d
             """
 
