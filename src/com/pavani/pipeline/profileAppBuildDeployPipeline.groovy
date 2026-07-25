@@ -106,7 +106,7 @@ def BuildDeployPipeline() {
                     docker logs profile-frontend-1 > frontend.log 2>&1 || true
                     docker logs profile-backend-1 > backend.log 2>&1 || true
                 '''
-                archiveArtifacts artifacts: '*.log' fingerprint: true
+                archiveArtifacts artifacts: '*.log', fingerprint: true
 
                 echo '******** Exiting Archive Docker Logs stage ********'
             }
