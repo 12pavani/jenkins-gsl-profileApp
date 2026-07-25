@@ -3,6 +3,9 @@ package com.pavani.pipeline
 def BuildDeployPipeline() {
     try {
         node {
+            def FRONTEND_IMAGE = "profile-frontend"
+            def BACKEND_IMAGE = "profile-backend"
+
             stage('Cleanup') {
                 echo '******** Entering cleanup stage ********'
 
@@ -42,7 +45,7 @@ def BuildDeployPipeline() {
             stage('Build Frontend') {
                 echo '******** Entering Build Frontend stage ********'
 
-                sh " docker build -t profile-frontend:${BUILD_NUMBER} frontend "
+                sh " docker build -t ${FRONTEND_IMAGE}:${BUILD_NUMBER} frontend "
 
                 echo '******** Exiting Build Frontend stage ********'
             }
@@ -50,7 +53,7 @@ def BuildDeployPipeline() {
             stage('Build Backend') {
                 echo '******** Entering Build Backend stage ********'
 
-                sh "docker build -t profile-backend:${BUILD_NUMBER} backend"
+                sh "docker build -t ${BACKEND_IMAGE}:${BUILD_NUMBER} backend"
 
                 echo '******** Exiting Build Backend stage ********'
             }
@@ -89,6 +92,14 @@ def BuildDeployPipeline() {
             '''
 
                 echo '******** Exiting Health Check stage ********'
+            }
+
+            stage('Docker Cleanup') {
+                echo '******** Entering Docker Cleanup stage ********'
+
+                sh "docker image prune -a -f"
+
+                echo '******** Exiting Docker Cleanup stage ********'
             }
         }
     } catch (Exception e) {
