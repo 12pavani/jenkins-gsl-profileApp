@@ -111,6 +111,18 @@ def BuildDeployPipeline() {
         currentBuild.result = 'FAILURE'
         throw e
     } finally {
+        stage('Archive Docker Logs') {
+            echo '******** Entering Archive Docker Logs stage ********'
+
+            sh ''' 
+                docker logs profile-frontend-1 > frontend.log 2>&1 || true
+                docker logs profile-backend-1 > backend.log 2>&1 || true
+            '''
+            archiveArtifacts artifacts: '*.log'
+
+            echo '******** Exiting Archive Docker Logs stage ********'
+        }
+
         stage('Email Notification') {
                 echo '******** Entering Email Notification stage ********'
 
