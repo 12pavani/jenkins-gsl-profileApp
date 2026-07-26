@@ -94,7 +94,7 @@ def BuildDeployPipeline() {
                         sleep(5)
                         sh """
                             # list running containers
-                            docker ps
+                            docker ps --filter "name=profileapp_dev_feature_builddeploy"
                             #frontend url
                             # -f is fail silently
                             curl -f ${FRONTEND_URL}
