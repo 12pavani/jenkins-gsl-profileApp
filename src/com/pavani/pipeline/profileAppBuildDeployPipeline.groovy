@@ -56,11 +56,11 @@ def BuildDeployPipeline() {
                         echo '******** Entering Build Information stage ********'
 
                         echo """
-                        Branch : ${env.BRANCH_NAME}
-                        Build  : ${env.BUILD_NUMBER}
-                        Node   : ${env.NODE_NAME}
-                        Job    : ${env.JOB_NAME}
-                        Workspace : ${env.WORKSPACE}
+                        Job Name      : ${env.JOB_NAME}
+                        Build Number  : ${env.BUILD_NUMBER}
+                        Build URL     : ${env.BUILD_URL}
+                        Node Name     : ${env.NODE_NAME}
+                        Workspace     : ${env.WORKSPACE}
                         """
 
                         echo '******** Exiting Build Information stage ********'
