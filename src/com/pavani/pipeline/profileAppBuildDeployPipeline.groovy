@@ -7,6 +7,12 @@ def BuildDeployPipeline() {
                 def FRONTEND_IMAGE = "profile-frontend"
                 def BACKEND_IMAGE = "profile-backend"
 
+                def FRONTEND_URL = "http://localhost:3000"
+                def BACKEND_URL = "http://localhost:8000/profile"
+
+                def FRONTEND_CONTAINER = "profileapp_dev_feature_builddeploy-profile-frontend-1"
+                def BACKEND_CONTAINER = "profileapp_dev_feature_builddeploy-profile-backend-1"
+
                 stage('Cleanup') {
                     echo '******** Entering cleanup stage ********'
 
@@ -86,15 +92,15 @@ def BuildDeployPipeline() {
                     retry(5) {
                         // pause execution for 5 seconds
                         sleep(5)
-                        sh '''
+                        sh """
                             # list running containers
                             docker ps
                             #frontend url
                             # -f is fail silently
-                            curl -f http://localhost:3000
+                            curl -f ${FRONTEND_URL}
                             #backend url
-                            curl -f http://localhost:8000/profile
-                        '''
+                            curl -f ${BACKEND_URL}
+                        """
                     }
 
                     echo '******** Exiting Health Check stage ********'
@@ -103,10 +109,10 @@ def BuildDeployPipeline() {
                 stage('Archive Docker Logs') {
                     echo '******** Entering Archive Docker Logs stage ********'
 
-                    sh '''
-                        docker logs profileapp_dev_feature_builddeploy-profile-frontend-1 > frontend.log 2>&1 || true
-                        docker logs profileapp_dev_feature_builddeploy-profile-backend-1 > backend.log 2>&1 || true
-                    '''
+                    sh """
+                        docker logs ${FRONTEND_CONTAINER} > frontend.log 2>&1 || true
+                        docker logs ${BACKEND_CONTAINER} > backend.log 2>&1 || true
+                    """
                     archiveArtifacts artifacts: '*.log', fingerprint: true
 
                     echo '******** Exiting Archive Docker Logs stage ********'
