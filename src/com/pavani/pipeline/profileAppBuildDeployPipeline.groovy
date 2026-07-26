@@ -52,6 +52,20 @@ def BuildDeployPipeline() {
                         echo '******** Exiting Checkout stage ********'
                     }
 
+                    stage('Build Information') {
+                        echo '******** Entering Build Information stage ********'
+
+                        echo """
+                        Branch : ${env.BRANCH_NAME}
+                        Build  : ${env.BUILD_NUMBER}
+                        Node   : ${env.NODE_NAME}
+                        Job    : ${env.JOB_NAME}
+                        Workspace : ${env.WORKSPACE}
+                        """
+
+                        echo '******** Exiting Build Information stage ********'
+                    }
+
                     stage('Build Frontend') {
                         echo '******** Entering Build Frontend stage ********'
 
