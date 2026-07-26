@@ -13,6 +13,8 @@ def BuildDeployPipeline() {
                 def FRONTEND_CONTAINER = "profileapp_dev_feature_builddeploy-profile-frontend-1"
                 def BACKEND_CONTAINER = "profileapp_dev_feature_builddeploy-profile-backend-1"
 
+                currentBuild.displayName = "Build-${BUILD_NUMBER}"
+
                 stage('Cleanup') {
                     echo '******** Entering cleanup stage ********'
 
