@@ -2,7 +2,7 @@ package com.pavani.pipeline
 
 def BuildDeployPipeline() {
     try {
-        timeout(time: 20, units: 'MINUTES') {
+        timeout(time: 20, unit: 'MINUTES') {
             timestamps {
                 node {
                     def FRONTEND_IMAGE = "profile-frontend"
