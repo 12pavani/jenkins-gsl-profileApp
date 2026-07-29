@@ -7,6 +7,8 @@ def BuildDeployPipeline() {
                 node {
                     def FRONTEND_IMAGE = "profile-frontend"
                     def BACKEND_IMAGE = "profile-backend"
+                    // Docker Hub user for tagging/pushing images
+                    def DOCKER_USER = "vislavathpavani5123"
 
                     def FRONTEND_URL = "http://localhost:3000"
                     def BACKEND_URL = "http://localhost:8000/profile"
@@ -88,6 +90,20 @@ def BuildDeployPipeline() {
                         sh 'docker images | grep "profile"'
 
                         echo '******** Exiting Verify images stage ********'
+                    }
+
+                    stage('Tag Images') {
+                        echo '******** Entering Tag Images stage ********'
+
+                        sh """
+                        // Tag frontend image
+                        docker tag ${FRONTEND_IMAGE}:${BUILD_NUMBER} ${DOCKER_USER}/${FRONTEND_IMAGE}:${BUILD_NUMBER}"
+
+                        // Tag backend image
+                        docker tag ${BACKEND_IMAGE}:${BUILD_NUMBER} ${DOCKER_USER}/${BACKEND_IMAGE}:${BUILD_NUMBER}
+                        """
+
+                        echo '******** Exiting Tag Images stage ********'
                     }
 
                     stage('Docker Compose') {
