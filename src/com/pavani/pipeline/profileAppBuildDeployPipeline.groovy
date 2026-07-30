@@ -106,6 +106,27 @@ def BuildDeployPipeline() {
                         echo '******** Exiting Tag Images stage ********'
                     }
 
+                    stage('Docker Login') {
+                        echo '******** Entering Docker Login stage ********'
+
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'dockerhub-cred',
+                                usernameVariable: 'USERNAME',
+                                passwordVariable: 'PASSWORD'
+                            )
+                        ]) {
+
+                            sh '''
+                                echo "$PASSWORD" | docker login \
+                                -u "$USERNAME" \
+                                --password-stdin
+                            '''
+                        }
+
+                        echo '******** Exiting Docker Login stage ********'
+                    }
+
                     stage('Docker Compose') {
                         echo '******** Entering Docker Compose stage ********'
 
