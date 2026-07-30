@@ -96,10 +96,10 @@ def BuildDeployPipeline() {
                         echo '******** Entering Tag Images stage ********'
 
                         sh """
-                        // Tag frontend image
-                        docker tag ${FRONTEND_IMAGE}:${BUILD_NUMBER} ${DOCKER_USER}/${FRONTEND_IMAGE}:${BUILD_NUMBER}"
+                        # Tag frontend image
+                        docker tag ${FRONTEND_IMAGE}:${BUILD_NUMBER} ${DOCKER_USER}/${FRONTEND_IMAGE}:${BUILD_NUMBER}
 
-                        // Tag backend image
+                        # Tag backend image
                         docker tag ${BACKEND_IMAGE}:${BUILD_NUMBER} ${DOCKER_USER}/${BACKEND_IMAGE}:${BUILD_NUMBER}
                         """
 
@@ -125,6 +125,20 @@ def BuildDeployPipeline() {
                         }
 
                         echo '******** Exiting Docker Login stage ********'
+                    }
+
+                    stage('Push Images') {
+                        echo '******** Entering Push Images stage ********'
+
+                        sh """ 
+                            # Push frontend image
+                            docker push ${DOCKER_USER}/${FRONTEND_IMAGE}:${BUILD_NUMBER}
+
+                            # Push backend image
+                            docker push ${DOCKER_USER}/${BACKEND_IMAGE}:${BUILD_NUMBER}
+                        """
+
+                        echo '******** Exiting Push Images stage ********'
                     }
 
                     stage('Docker Compose') {
