@@ -55,6 +55,7 @@ def BuildDeployPipeline() {
                     }
 
                     stage('Git Information') {
+                        echo '******** Entering Git Information stage ********'
 
                         sh '''
                             echo "Branch      : $(git branch --show-current)"
@@ -62,6 +63,8 @@ def BuildDeployPipeline() {
                             echo "Commit Msg  : $(git log -1 --pretty=%B)"
                             echo "Commit By   : $(git log -1 --pretty=%an)"
                         '''
+
+                        echo '******** Exiting Git Information stage ********'
                     }
 
                     stage('Build Information') {
