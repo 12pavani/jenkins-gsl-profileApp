@@ -54,6 +54,16 @@ def BuildDeployPipeline() {
                         echo '******** Exiting Checkout stage ********'
                     }
 
+                    stage('Git Information') {
+
+                        sh '''
+                            echo "Branch      : $(git branch --show-current)"
+                            echo "Commit ID   : $(git rev-parse HEAD)"
+                            echo "Commit Msg  : $(git log -1 --pretty=%B)"
+                            echo "Commit By   : $(git log -1 --pretty=%an)"
+                        '''
+                    }
+
                     stage('Build Information') {
                         echo '******** Entering Build Information stage ********'
 
