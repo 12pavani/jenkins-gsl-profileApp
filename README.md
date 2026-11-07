@@ -1936,3 +1936,1239 @@ docker pull vislavathpavani5123/profile-backend:5</code></pre>
    Versioned  Versioned
      Image      Image</code></pre>
 
+
+<!-- DEPLOYMENT, VALIDATION, TROUBLESHOOTING AND PROJECT CONCLUSION -->
+
+<hr/>
+
+<h2>13. Application Deployment Using Docker Compose</h2>
+
+<p>
+  After successfully building and publishing the frontend and backend Docker images, the pipeline deploys the application using Docker Compose.
+</p>
+
+<p>
+  Docker Compose manages the application services and starts the frontend and backend containers together using the project's Compose configuration.
+</p>
+
+<h3>13.1 Deployment Workflow</h3>
+
+<pre><code>Docker Hub
+    |
+    v
+Published Frontend and Backend Images
+    |
+    v
+Jenkins Deployment Stage
+    |
+    v
+Set BUILD_NUMBER
+    |
+    v
+Stop Existing Compose Services
+    |
+    v
+Start Application Services
+    |
+    v
+Frontend + Backend Containers</code></pre>
+
+<h3>13.2 Pass the Jenkins Build Number</h3>
+
+<pre><code>export BUILD_NUMBER=${BUILD_NUMBER}</code></pre>
+
+<p>
+  The Jenkins build number is exported as an environment variable so that the Docker Compose configuration can use the corresponding image version.
+</p>
+
+<p>
+  For example, when Jenkins executes build number 5, the deployment can use the image tags associated with build 5.
+</p>
+
+<h3>13.3 Stop Existing Containers</h3>
+
+<pre><code>docker compose down || true</code></pre>
+
+<p>
+  This command stops and removes the existing Compose-managed containers and networks before starting the new deployment.
+</p>
+
+<p>
+  The <code>|| true</code> expression prevents a failure in the shutdown command from stopping the shell execution at that point.
+</p>
+
+<p>
+  This is useful when there may be no existing Compose deployment to stop. However, it can also hide a genuine shutdown problem, so production pipelines should handle and report cleanup failures more carefully.
+</p>
+
+<h3>13.4 Start the Application</h3>
+
+<pre><code>docker compose -f docker-compose.yaml up -d</code></pre>
+
+<p>
+  This command starts the services defined in <code>docker-compose.yaml</code>.
+</p>
+
+<ul>
+  <li><code>-f</code> specifies the Compose configuration file.</li>
+  <li><code>up</code> creates and starts the configured services.</li>
+  <li><code>-d</code> runs the containers in detached mode.</li>
+</ul>
+
+<p>
+  The frontend and backend services run as separate containers and communicate according to the Docker Compose network configuration.
+</p>
+
+<h3>13.5 Verify Running Containers</h3>
+
+<pre><code>docker ps</code></pre>
+
+<p>
+  This command lists running Docker containers and provides information such as container ID, image, status, ports, and container name.
+</p>
+
+<p>
+  The pipeline also filters containers using the application-specific name prefix:
+</p>
+
+<pre><code>docker ps --filter name=profileapp_dev_feature_builddeploy</code></pre>
+
+<p>
+  This helps identify the expected application containers.
+</p>
+
+<p><strong>Important:</strong> A container appearing in <code>docker ps</code> confirms that it is running. It does not independently prove that the application is responding correctly. That is why the pipeline performs HTTP health checks separately.</p>
+
+<h3>13.6 Deployment Consideration: Downtime</h3>
+
+<p>
+  The current deployment sequence runs <code>docker compose down</code> before <code>docker compose up -d</code>.
+</p>
+
+<p>
+  This creates a period during which the existing containers are stopped before the replacement containers become available. Therefore, the current approach is a stop-and-recreate deployment, not a zero-downtime deployment.
+</p>
+
+<p>
+  For production environments, this can be improved using rolling deployments, blue-green deployment, or another deployment strategy that keeps the previous application version available until the replacement is ready.
+</p>
+
+---
+
+<h2>14. Application Health Checks and Validation</h2>
+
+<p>
+  A successful Docker image build or container startup does not necessarily mean that the application is functioning correctly.
+</p>
+
+<p>
+  The pipeline therefore performs HTTP-based checks against the frontend and backend after deployment.
+</p>
+
+<h3>14.1 Health Check Strategy</h3>
+
+<p>
+  The pipeline uses Jenkins' <code>retry</code> mechanism to allow the application some time to initialize before declaring the deployment unsuccessful.
+</p>
+
+<pre><code>retry(5) {
+    sleep 5
+
+    // Container visibility check
+
+    // Frontend HTTP check
+
+    // Backend HTTP check
+}</code></pre>
+
+<p>
+  The health-check block can execute up to five attempts. Each attempt includes a five-second sleep before the validation commands.
+</p>
+
+<p>
+  This provides approximately 25 seconds of waiting time across five attempts, excluding the time spent executing the individual commands and requests.
+</p>
+
+<h3>14.2 Check Frontend Availability</h3>
+
+<pre><code>curl -f http://localhost:3000</code></pre>
+
+<p>
+  This sends an HTTP request to the frontend endpoint exposed on port 3000.
+</p>
+
+<p>
+  The <code>-f</code> option makes curl return a failure status for HTTP responses with status codes of 400 or higher.
+</p>
+
+<p>
+  This allows Jenkins to detect unsuccessful HTTP responses instead of treating every HTTP response as a successful check.
+</p>
+
+<h3>14.3 Check Backend Availability</h3>
+
+<pre><code>curl -f http://localhost:8000/profile</code></pre>
+
+<p>
+  This sends an HTTP request to the backend profile endpoint exposed on port 8000.
+</p>
+
+<p>
+  The pipeline checks both application components independently:
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Component</th>
+      <th>Endpoint</th>
+      <th>Validation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Frontend</td>
+      <td><code>http://localhost:3000</code></td>
+      <td>HTTP response check</td>
+    </tr>
+    <tr>
+      <td>Backend</td>
+      <td><code>http://localhost:8000/profile</code></td>
+      <td>HTTP response check</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>14.4 Why Retry Health Checks?</h3>
+
+<p>
+  Containers may take a few seconds to initialize after Docker Compose starts them.
+</p>
+
+<p>
+  Without a retry mechanism, Jenkins could mark the deployment as failed simply because an HTTP endpoint was checked before the application finished starting.
+</p>
+
+<p>
+  Retry provides a limited opportunity for the services to become ready.
+</p>
+
+<h3>14.5 Health Check Limitations</h3>
+
+<p>
+  The current checks validate HTTP availability and successful response status. They do not validate the complete business functionality of the application.
+</p>
+
+<p>
+  Additional production-grade validation could include:
+</p>
+
+<ul>
+  <li>Dedicated application health endpoints.</li>
+  <li>Response body validation.</li>
+  <li>Database connectivity checks, if applicable.</li>
+  <li>Container health status using Docker health checks.</li>
+  <li>Readiness and liveness probes in Kubernetes deployments.</li>
+  <li>Automated integration and smoke tests.</li>
+</ul>
+
+---
+
+<h2>15. Container Log Collection and Artifact Archiving</h2>
+
+<p>
+  Logs are important for understanding application behavior and diagnosing deployment failures.
+</p>
+
+<p>
+  After deployment and health validation, the pipeline collects logs from the frontend and backend containers and archives them in Jenkins.
+</p>
+
+<h3>15.1 Collect Frontend Logs</h3>
+
+<p>
+  The pipeline uses the configured frontend container name to retrieve its logs.
+</p>
+
+<pre><code>docker logs profileapp_dev_feature_builddeploy-profile-frontend-1 \
+  &gt; frontend.log 2&gt;&amp;1</code></pre>
+
+<p>
+  The command redirects the container's standard output and standard error into <code>frontend.log</code>.
+</p>
+
+<h3>15.2 Collect Backend Logs</h3>
+
+<pre><code>docker logs profileapp_dev_feature_builddeploy-profile-backend-1 \
+  &gt; backend.log 2&gt;&amp;1</code></pre>
+
+<p>
+  This collects the backend container logs into <code>backend.log</code>.
+</p>
+
+<h3>15.3 Archive Logs in Jenkins</h3>
+
+<pre><code>archiveArtifacts artifacts: '*.log', fingerprint: true</code></pre>
+
+<p>
+  Jenkins archives the matching log files from the workspace as build artifacts.
+</p>
+
+<p>The configuration has two important parts:</p>
+
+<ul>
+  <li><code>artifacts: '*.log'</code> – Selects log files in the workspace that match the pattern.</li>
+  <li><code>fingerprint: true</code> – Enables artifact fingerprinting for tracking artifacts across Jenkins builds.</li>
+</ul>
+
+<h3>15.4 Where to Find Archived Logs</h3>
+
+<pre><code>Jenkins Dashboard
+       |
+       v
+Profile App Pipeline Job
+       |
+       v
+Select Build Number
+       |
+       v
+Build Artifacts
+       |
+       +---- frontend.log
+       |
+       +---- backend.log</code></pre>
+
+<p>
+  The archived files can be downloaded from the corresponding Jenkins build page for troubleshooting and inspection.
+</p>
+
+<h3>15.5 Why Archive Logs?</h3>
+
+<ul>
+  <li>Preserves application logs for later investigation.</li>
+  <li>Helps diagnose frontend and backend startup problems.</li>
+  <li>Provides useful information when a deployment fails.</li>
+  <li>Maintains build-level troubleshooting evidence.</li>
+</ul>
+
+<p>
+  The current implementation uses fixed container names. If Compose naming changes, the log collection commands must be updated or replaced with a more dynamic container discovery approach.
+</p>
+
+---
+
+<h2>16. Docker Resource Cleanup</h2>
+
+<p>
+  Docker images can consume significant disk space, particularly when Jenkins creates new image versions for every build.
+</p>
+
+<p>
+  To reduce unused image accumulation, the pipeline executes a Docker cleanup command.
+</p>
+
+<h3>16.1 Remove Unused Docker Images</h3>
+
+<pre><code>docker image prune -a -f</code></pre>
+
+<p>Command breakdown:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Option</th>
+      <th>Meaning</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>docker image prune</code></td>
+      <td>Removes unused Docker images.</td>
+    </tr>
+    <tr>
+      <td><code>-a</code></td>
+      <td>Includes all images not referenced by existing containers, rather than only dangling images.</td>
+    </tr>
+    <tr>
+      <td><code>-f</code></td>
+      <td>Skips the interactive confirmation prompt.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>16.2 Why Cleanup Matters</h3>
+
+<ul>
+  <li>Controls unnecessary Docker image accumulation.</li>
+  <li>Helps manage disk usage on the Jenkins execution host.</li>
+  <li>Reduces unused local image storage.</li>
+</ul>
+
+<h3>16.3 Important Cleanup Risk</h3>
+
+<p>
+  The command <code>docker image prune -a -f</code> is not restricted to this project. It can remove every image on the Docker host that is not currently referenced by a container.
+</p>
+
+<p>
+  This may affect unrelated projects sharing the same Docker daemon and can remove images that would otherwise be useful for future builds.
+</p>
+
+<p>
+  For a shared or production Docker host, prefer targeted cleanup, image retention policies, or scheduled cleanup with explicit ownership rules.
+</p>
+
+---
+
+<h2>17. Pipeline Error Handling and Email Notifications</h2>
+
+<p>
+  A reliable CI/CD pipeline should not only execute build and deployment operations but also handle failures and communicate the final execution status.
+</p>
+
+<p>
+  The pipeline uses <code>try</code>, <code>catch</code>, and <code>finally</code> to manage execution errors and send an email notification.
+</p>
+
+<h3>17.1 Try Block</h3>
+
+<p>
+  The main pipeline operations execute inside the <code>try</code> block.
+</p>
+
+<p>
+  These operations include source checkout, Docker image creation, image publishing, deployment, health checks, and post-deployment tasks.
+</p>
+
+<h3>17.2 Catch Block</h3>
+
+<p>
+  If an operation throws an exception, the pipeline enters the <code>catch</code> block.
+</p>
+
+<p>
+  The implementation marks the current build as failed and rethrows the exception.
+</p>
+
+<pre><code>catch (Exception e) {
+    currentBuild.result = 'FAILURE'
+    throw e
+}</code></pre>
+
+<p>
+  Rethrowing the exception is important because it preserves the failure signal instead of allowing Jenkins to treat the pipeline as successful.
+</p>
+
+<h3>17.3 Finally Block</h3>
+
+<p>
+  The <code>finally</code> block executes after the try/catch processing, regardless of whether the main pipeline succeeds or fails, subject to Jenkins interruption and execution conditions.
+</p>
+
+<p>
+  In this project, the finally block is used to send the build notification through the Email Extension plugin.
+</p>
+
+<h3>17.4 Email Notification</h3>
+
+<p>
+  The pipeline uses the <code>emailext</code> step to send an email containing the Jenkins build result.
+</p>
+
+<p>The notification includes information such as:</p>
+
+<ul>
+  <li>Jenkins job name.</li>
+  <li>Build number.</li>
+  <li>Current build result.</li>
+  <li>Jenkins build URL.</li>
+</ul>
+
+<p>The subject follows this pattern:</p>
+
+<pre><code>Profile App Build - ${currentBuild.currentResult}</code></pre>
+
+<p>The configured recipient is:</p>
+
+<pre><code>vislavathpavani5123@gmail.com</code></pre>
+
+<p>
+  The notification helps identify whether a particular pipeline execution completed successfully or failed.
+</p>
+
+<h3>17.5 Email Extension Plugin Requirement</h3>
+
+<p>
+  The <code>emailext</code> pipeline step requires the Jenkins Email Extension plugin and working SMTP configuration.
+</p>
+
+<p>
+  Installing the plugin alone is not sufficient. Configure the SMTP server, sender information, authentication where required, and test email delivery from Jenkins.
+</p>
+
+<h3>17.6 Error Handling Flow</h3>
+
+<pre><code>      Pipeline Starts
+            |
+            v
+        Try Block
+            |
+            v
+   Execute CI/CD Operations
+            |
+       +----+----+
+       |         |
+       v         v
+    Success    Failure
+       |         |
+       |         v
+       |      Catch Block
+       |         |
+       |         v
+       |    Mark Failure
+       |         |
+       |         v
+       |    Rethrow Error
+       |         |
+       +----+----+
+            |
+            v
+       Finally Block
+            |
+            v
+     Email Notification
+            |
+            v
+      Pipeline Result</code></pre>
+
+---
+
+<h2>18. End-to-End CI/CD Execution Summary</h2>
+
+<p>
+  The following sequence summarizes the complete workflow implemented in the project.
+</p>
+
+<pre><code>             DEVELOPER
+                 |
+                 v
+       Push Code to GitHub
+                 |
+                 v
+         GitHub Webhook
+                 |
+                 v
+              JENKINS
+                 |
+                 v
+       Load Shared Library
+                 |
+                 v
+      BuildDeployPipeline()
+                 |
+                 v
+       Initialize Workspace
+                 |
+                 v
+        Checkout Source Code
+                 |
+                 v
+       Collect Build Metadata
+                 |
+                 v
+       Build Frontend Image
+                 |
+                 v
+       Build Backend Image
+                 |
+                 v
+        Verify Docker Images
+                 |
+                 v
+           Tag Images
+                 |
+                 v
+       Authenticate Docker Hub
+                 |
+                 v
+          Push Both Images
+                 |
+                 v
+       Deploy with Compose
+                 |
+                 v
+       Validate Application
+                 |
+                 v
+         Collect Logs
+                 |
+                 v
+       Archive Jenkins Logs
+                 |
+                 v
+        Docker Cleanup
+                 |
+                 v
+       Send Email Notification</code></pre>
+
+<h3>18.1 Pipeline Stage Responsibility</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Execution Area</th>
+      <th>Responsibility</th>
+      <th>Expected Outcome</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Initialization</td>
+      <td>Prepare Jenkins execution context.</td>
+      <td>Clean workspace and available Docker environment.</td>
+    </tr>
+    <tr>
+      <td>Source Checkout</td>
+      <td>Retrieve application code.</td>
+      <td>Frontend and backend source available.</td>
+    </tr>
+    <tr>
+      <td>Build</td>
+      <td>Create Docker images.</td>
+      <td>Two locally built application images.</td>
+    </tr>
+    <tr>
+      <td>Image Publishing</td>
+      <td>Authenticate and push images.</td>
+      <td>Versioned images available in Docker Hub.</td>
+    </tr>
+    <tr>
+      <td>Deployment</td>
+      <td>Start application services.</td>
+      <td>Frontend and backend containers started.</td>
+    </tr>
+    <tr>
+      <td>Validation</td>
+      <td>Check application endpoints.</td>
+      <td>HTTP checks return successful responses.</td>
+    </tr>
+    <tr>
+      <td>Post-Deployment</td>
+      <td>Collect logs and clean resources.</td>
+      <td>Build artifacts and reduced unused image storage.</td>
+    </tr>
+    <tr>
+      <td>Notification</td>
+      <td>Communicate execution status.</td>
+      <td>Email notification with build information.</td>
+    </tr>
+  </tbody>
+</table>
+
+---
+
+<h2>19. Troubleshooting and Issues Resolved</h2>
+
+<p>
+  During implementation, several environment and integration issues were encountered. Resolving these issues helped validate the interactions between Jenkins, Docker Desktop, GitHub, ngrok, and Docker Hub.
+</p>
+
+<h3>19.1 Docker Command Not Found in Jenkins</h3>
+
+<p><strong>Observed problem:</strong></p>
+
+<pre><code>docker: command not found</code></pre>
+
+<p>
+  Docker Desktop was running, and Docker commands worked in the regular macOS terminal. However, Jenkins could not initially locate the Docker executable.
+</p>
+
+<p><strong>Root cause:</strong></p>
+
+<p>
+  Jenkins was running with a different environment PATH from the interactive terminal. The Docker executable was not available in the Jenkins process environment.
+</p>
+
+<p><strong>Resolution:</strong></p>
+
+<p>
+  Jenkins was started in the foreground with the required PATH configuration.
+</p>
+
+<pre><code>brew services stop jenkins-lts
+
+export PATH=$PATH:/usr/local/bin
+
+jenkins-lts</code></pre>
+
+<p>
+  The Docker executable was available at:
+</p>
+
+<pre><code>/usr/local/bin/docker</code></pre>
+
+<p>
+  After starting Jenkins with the correct PATH, the Docker availability check succeeded.
+</p>
+
+<p><strong>Key learning:</strong> A tool being installed and working in an interactive terminal does not guarantee that a Jenkins process can access it. Jenkins must have the correct executable PATH and Docker daemon access.</p>
+
+<h3>19.2 Understanding the Role of ngrok</h3>
+
+<p><strong>Observed confusion:</strong></p>
+
+<p>
+  Jenkins was running locally, and ngrok was also being used. It was important to distinguish which problem ngrok actually solves.
+</p>
+
+<p><strong>Explanation:</strong></p>
+
+<ul>
+  <li>Jenkins runs the pipeline.</li>
+  <li>Docker Desktop provides the Docker daemon.</li>
+  <li>The Docker CLI communicates with the Docker daemon.</li>
+  <li>ngrok exposes the local Jenkins HTTP endpoint for incoming webhook requests.</li>
+</ul>
+
+<p>
+  ngrok does not install Docker, start Docker containers, or provide Docker connectivity to Jenkins.
+</p>
+
+<h3>19.3 Docker Compose Could Not Find the Required Images</h3>
+
+<p><strong>Observed problem:</strong></p>
+
+<p>
+  Docker Compose attempted to pull images when the expected local images had not been built with the names and tags referenced by the Compose configuration.
+</p>
+
+<p><strong>Root cause:</strong></p>
+
+<p>
+  The Compose configuration referenced image names that were not available locally. The application configuration also did not provide Compose build directives for automatically building those images.
+</p>
+
+<p><strong>Resolution:</strong></p>
+
+<p>
+  Build the images explicitly before starting the Compose services, ensuring that their names and tags match the Compose configuration.
+</p>
+
+<pre><code>cd ~/Projects/Profile_App
+
+export BUILD_NUMBER=local
+
+docker build -t profile-backend:local ./backend
+
+docker build -t profile-frontend:local ./frontend
+
+docker compose up -d</code></pre>
+
+<p>
+  The commands above illustrate the local manual build workflow. The image names and tags must remain consistent with the Compose configuration being used.
+</p>
+
+<h3>19.4 Docker Hub Authentication Failure</h3>
+
+<p><strong>Observed error:</strong></p>
+
+<pre><code>unauthorized: personal access token is expired</code></pre>
+
+<p><strong>Root cause:</strong></p>
+
+<p>
+  The Docker Hub Personal Access Token stored in Jenkins had expired.
+</p>
+
+<p><strong>Resolution:</strong></p>
+
+<ol>
+  <li>Generate a new Docker Hub token.</li>
+  <li>Update the existing <code>dockerhub-cred</code> Jenkins credential.</li>
+  <li>Verify that the token has image-publishing permissions.</li>
+  <li>Rerun the pipeline.</li>
+</ol>
+
+<h3>19.5 ngrok URL Changes</h3>
+
+<p><strong>Possible problem:</strong></p>
+
+<p>
+  A previously configured GitHub webhook may stop reaching Jenkins after ngrok is restarted.
+</p>
+
+<p><strong>Root cause:</strong></p>
+
+<p>
+  A temporary ngrok URL can change when the tunnel is restarted.
+</p>
+
+<p><strong>Resolution:</strong></p>
+
+<p>
+  Update the GitHub webhook payload URL with the currently active ngrok HTTPS address.
+</p>
+
+<h3>19.6 Quick Troubleshooting Reference</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Symptom</th>
+      <th>First Check</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Docker command unavailable</td>
+      <td>Jenkins PATH and Docker executable.</td>
+    </tr>
+    <tr>
+      <td>Docker daemon connection failure</td>
+      <td>Docker Desktop status and Docker context.</td>
+    </tr>
+    <tr>
+      <td>Git checkout failure</td>
+      <td>Repository URL, branch, and <code>github-cred</code>.</td>
+    </tr>
+    <tr>
+      <td>Docker build failure</td>
+      <td>Dockerfile, build context, and application dependencies.</td>
+    </tr>
+    <tr>
+      <td>Docker push unauthorized</td>
+      <td>Docker Hub token validity and permissions.</td>
+    </tr>
+    <tr>
+      <td>Compose image not found</td>
+      <td>Image repository names and build-number tags.</td>
+    </tr>
+    <tr>
+      <td>Application health check failure</td>
+      <td>Container status, application logs, port mappings, and endpoints.</td>
+    </tr>
+    <tr>
+      <td>Logs not archived</td>
+      <td>Container names, log commands, and workspace files.</td>
+    </tr>
+    <tr>
+      <td>Email not delivered</td>
+      <td>Email Extension plugin and SMTP configuration.</td>
+    </tr>
+  </tbody>
+</table>
+
+---
+
+<h2>20. Security and Reliability Considerations</h2>
+
+<p>
+  The project demonstrates several useful DevOps practices. The following considerations are important when evolving the implementation toward a production-ready delivery pipeline.
+</p>
+
+<h3>20.1 Secrets Management</h3>
+
+<ul>
+  <li>Keep Docker Hub tokens and GitHub credentials inside Jenkins Credentials.</li>
+  <li>Avoid hardcoding secrets in source code.</li>
+  <li>Use scoped and revocable Personal Access Tokens.</li>
+  <li>Restrict access to Jenkins credentials.</li>
+  <li>Rotate credentials before expiration.</li>
+</ul>
+
+<h3>20.2 Image Versioning</h3>
+
+<p>
+  The current implementation uses the Jenkins build number as the Docker image tag.
+</p>
+
+<p>
+  A future enhancement could include the Git commit SHA as an additional tag to make image-to-source traceability stronger.
+</p>
+
+<pre><code>profile-frontend:${BUILD_NUMBER}
+profile-backend:${BUILD_NUMBER}</code></pre>
+
+<p>
+  Additional traceability tags could follow a pattern such as:
+</p>
+
+<pre><code>profile-frontend:${GIT_COMMIT}
+profile-backend:${GIT_COMMIT}</code></pre>
+
+<p>
+  These are suggested improvements, not additional tags currently confirmed in the implementation.
+</p>
+
+<h3>20.3 Docker Image Cleanup</h3>
+
+<p>
+  Replace broad host-wide cleanup with a targeted image retention strategy, especially when Jenkins shares a Docker daemon with other workloads.
+</p>
+
+<h3>20.4 Deployment Reliability</h3>
+
+<p>
+  The current stop-and-recreate Compose deployment can introduce downtime.
+</p>
+
+<p>
+  A production implementation should consider:
+</p>
+
+<ul>
+  <li>Blue-green deployments.</li>
+  <li>Rolling updates.</li>
+  <li>Automated rollback to the previous working image.</li>
+  <li>Application readiness checks before switching traffic.</li>
+  <li>Deployment approval gates where required.</li>
+</ul>
+
+<h3>20.5 Configuration Management</h3>
+
+<p>
+  Avoid hardcoded container names and environment-specific endpoints wherever possible.
+</p>
+
+<p>
+  Use configuration variables, Compose service discovery, and environment-specific configuration to make the pipeline easier to maintain across development, staging, and production environments.
+</p>
+
+<h3>20.6 Observability</h3>
+
+<p>
+  Jenkins build logs and archived container logs provide basic troubleshooting information.
+</p>
+
+<p>
+  Additional observability can be introduced through centralized logging, metrics collection, dashboards, and alerting.
+</p>
+
+---
+
+<h2>21. Future Enhancements</h2>
+
+<p>
+  The current project provides an end-to-end foundation for automated application delivery. The following enhancements can extend it toward a more scalable and production-oriented DevOps workflow.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Area</th>
+      <th>Proposed Enhancement</th>
+      <th>Expected Benefit</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Code Quality</td>
+      <td>Integrate automated linting and static analysis.</td>
+      <td>Detect code quality issues earlier.</td>
+    </tr>
+    <tr>
+      <td>Testing</td>
+      <td>Add unit, integration, and smoke tests.</td>
+      <td>Improve release confidence.</td>
+    </tr>
+    <tr>
+      <td>Security</td>
+      <td>Integrate SAST, SCA, and container image scanning.</td>
+      <td>Identify vulnerabilities before deployment.</td>
+    </tr>
+    <tr>
+      <td>Image Management</td>
+      <td>Introduce image retention and vulnerability policies.</td>
+      <td>Improve registry and storage management.</td>
+    </tr>
+    <tr>
+      <td>Deployment</td>
+      <td>Implement blue-green or rolling deployments.</td>
+      <td>Reduce deployment downtime.</td>
+    </tr>
+    <tr>
+      <td>Rollback</td>
+      <td>Automate rollback to a previous image version.</td>
+      <td>Improve recovery from failed releases.</td>
+    </tr>
+    <tr>
+      <td>Orchestration</td>
+      <td>Deploy the application to Kubernetes.</td>
+      <td>Enable container orchestration and scaling.</td>
+    </tr>
+    <tr>
+      <td>Monitoring</td>
+      <td>Integrate Prometheus and Grafana.</td>
+      <td>Improve infrastructure and application visibility.</td>
+    </tr>
+    <tr>
+      <td>Logging</td>
+      <td>Introduce centralized log management.</td>
+      <td>Improve investigation across services.</td>
+    </tr>
+    <tr>
+      <td>Notifications</td>
+      <td>Extend notifications with richer failure details.</td>
+      <td>Improve incident awareness.</td>
+    </tr>
+  </tbody>
+</table>
+
+---
+
+<h2>22. Technical Concepts Demonstrated</h2>
+
+<p>
+  This project brings together multiple DevOps concepts in a single application delivery workflow.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Technology / Concept</th>
+      <th>How It Is Used</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Jenkins</td>
+      <td>Orchestrates the CI/CD workflow.</td>
+    </tr>
+    <tr>
+      <td>Jenkins Shared Library</td>
+      <td>Stores reusable Groovy pipeline logic.</td>
+    </tr>
+    <tr>
+      <td>Groovy</td>
+      <td>Implements pipeline automation.</td>
+    </tr>
+    <tr>
+      <td>GitHub</td>
+      <td>Hosts application and pipeline source code.</td>
+    </tr>
+    <tr>
+      <td>GitHub Webhooks</td>
+      <td>Notify Jenkins about repository events.</td>
+    </tr>
+    <tr>
+      <td>ngrok</td>
+      <td>Exposes the local Jenkins endpoint for webhook access.</td>
+    </tr>
+    <tr>
+      <td>Docker</td>
+      <td>Builds and runs container images.</td>
+    </tr>
+    <tr>
+      <td>Docker Compose</td>
+      <td>Manages the frontend and backend services.</td>
+    </tr>
+    <tr>
+      <td>Docker Hub</td>
+      <td>Stores and distributes versioned container images.</td>
+    </tr>
+    <tr>
+      <td>Jenkins Credentials</td>
+      <td>Manages authentication details securely.</td>
+    </tr>
+    <tr>
+      <td>Shell Scripting</td>
+      <td>Automates Docker, Git, and HTTP operations.</td>
+    </tr>
+    <tr>
+      <td>HTTP Health Checks</td>
+      <td>Validates application endpoint availability.</td>
+    </tr>
+    <tr>
+      <td>Artifact Archiving</td>
+      <td>Preserves frontend and backend logs in Jenkins.</td>
+    </tr>
+  </tbody>
+</table>
+
+---
+
+<h2>23. Interview Preparation – Project Questions and Answers</h2>
+
+<p>
+  The following questions help explain the architecture, implementation decisions, troubleshooting experience, and limitations of the project during a technical interview.
+</p>
+
+<h3>Q1. Can you explain your project?</h3>
+
+<p>
+  I developed an automated CI/CD workflow for a frontend and backend application using Jenkins, Groovy, Docker, Docker Compose, GitHub, and Docker Hub.
+</p>
+
+<p>
+  I implemented reusable pipeline logic through a Jenkins Shared Library. The pipeline checks out application code, builds separate frontend and backend Docker images, tags them using the Jenkins build number, authenticates with Docker Hub, and publishes the images.
+</p>
+
+<p>
+  It then deploys the application using Docker Compose, validates the frontend and backend endpoints, collects container logs, archives them in Jenkins, performs Docker image cleanup, and sends an email notification with the build result.
+</p>
+
+<h3>Q2. Why did you use a Jenkins Shared Library?</h3>
+
+<p>
+  I used a Shared Library to separate reusable pipeline implementation from the Jenkins job configuration.
+  It makes the pipeline easier to maintain, modularize, and reuse across multiple jobs.
+</p>
+
+<h3>Q3. What is the difference between a Jenkinsfile and a Shared Library?</h3>
+
+<p>
+  A Jenkinsfile defines the pipeline entry point and job-specific execution configuration. A Shared Library stores reusable pipeline steps and Groovy implementation that can be called by Jenkins pipeline jobs.
+</p>
+
+<h3>Q4. Why did you use Docker for this application?</h3>
+
+<p>
+  Docker packages application components and their runtime dependencies into container images. Keeping frontend and backend in separate images makes them independently buildable and deployable.
+</p>
+
+<h3>Q5. Why did you use Docker Compose?</h3>
+
+<p>
+  Docker Compose allows multiple related application services to be defined and managed together through a YAML configuration file. It simplifies starting the frontend and backend services and managing their network configuration.
+</p>
+
+<h3>Q6. How are Docker image versions managed?</h3>
+
+<p>
+  The pipeline uses the Jenkins build number as the image tag. This associates the frontend and backend images with the same Jenkins execution and makes it easier to identify a particular build.
+</p>
+
+<h3>Q7. How are Docker Hub credentials managed?</h3>
+
+<p>
+  I configured a username/password credential in Jenkins using the ID <code>dockerhub-cred</code>. The pipeline retrieves the username and Personal Access Token using the <code>withCredentials</code> step and authenticates with Docker using <code>--password-stdin</code>.
+</p>
+
+<h3>Q8. What was the Docker issue you encountered with Jenkins?</h3>
+
+<p>
+  Docker commands were working in my regular macOS terminal but Jenkins initially could not find the Docker executable. I identified that the Jenkins process had a different PATH environment. Starting Jenkins with the required PATH configuration resolved the issue.
+</p>
+
+<h3>Q9. Why did you use ngrok?</h3>
+
+<p>
+  Jenkins was running locally, so GitHub could not directly access its localhost endpoint. I used ngrok to expose the local Jenkins endpoint through a public HTTPS forwarding URL for webhook communication.
+</p>
+
+<h3>Q10. How do you validate the deployment?</h3>
+
+<p>
+  The pipeline checks the frontend endpoint at <code>http://localhost:3000</code> and the backend endpoint at <code>http://localhost:8000/profile</code> using curl. It also uses retry logic to allow the services time to initialize.
+</p>
+
+<h3>Q11. What happens if the health check fails?</h3>
+
+<p>
+  The retry block attempts the health-check operation up to five times. If the operation continues to fail, the exception propagates to the pipeline error-handling logic, which marks the build as failed and rethrows the error.
+</p>
+
+<h3>Q12. How do you collect application logs?</h3>
+
+<p>
+  I use <code>docker logs</code> to collect the frontend and backend container logs into separate files. Jenkins then archives the matching log files using <code>archiveArtifacts</code> with fingerprinting enabled.
+</p>
+
+<h3>Q13. How are pipeline failures communicated?</h3>
+
+<p>
+  The pipeline uses a try/catch/finally structure. The catch block marks the build as failed and rethrows the exception. The finally block sends an email notification containing the job name, build number, build status, and Jenkins build URL.
+</p>
+
+<h3>Q14. Is this a zero-downtime deployment?</h3>
+
+<p>
+  No. The current Docker Compose implementation stops the existing services using <code>docker compose down</code> before starting the new deployment. This can cause temporary downtime. A blue-green or rolling deployment strategy would be a better approach for minimizing downtime.
+</p>
+
+<h3>Q15. What would you improve in this pipeline?</h3>
+
+<p>
+  I would add automated testing, static code analysis, container image vulnerability scanning, better image retention, targeted cleanup, deployment rollback, and centralized monitoring. I would also improve the deployment strategy to reduce downtime and replace hardcoded container names with dynamic discovery.
+</p>
+
+<h3>Q16. What did you learn from this project?</h3>
+
+<p>
+  The project helped me understand how Jenkins Shared Libraries, Groovy, GitHub webhooks, Docker, Docker Compose, and Docker Hub work together in an automated delivery workflow. It also gave me practical experience troubleshooting environment PATH issues, Docker connectivity, image tagging, registry authentication, and application availability checks.
+</p>
+
+---
+
+<h2>24. Project Outcomes</h2>
+
+<p>
+  The project demonstrates an automated delivery workflow for a multi-component application, with reusable pipeline implementation and container-based deployment.
+</p>
+
+<ul>
+  <li>Implemented reusable Jenkins pipeline logic using a Groovy Shared Library.</li>
+  <li>Integrated GitHub source checkout into Jenkins.</li>
+  <li>Configured a webhook-based approach for triggering Jenkins from GitHub events.</li>
+  <li>Automated independent frontend and backend Docker image builds.</li>
+  <li>Implemented build-number-based Docker image tagging.</li>
+  <li>Integrated Jenkins Credentials for GitHub and Docker Hub authentication.</li>
+  <li>Automated Docker Hub image publishing.</li>
+  <li>Deployed application services using Docker Compose.</li>
+  <li>Implemented frontend and backend HTTP availability checks.</li>
+  <li>Collected and archived container logs in Jenkins.</li>
+  <li>Added Docker cleanup and email notification logic.</li>
+  <li>Resolved practical environment and registry authentication issues.</li>
+</ul>
+
+<h3>24.1 What This Project Demonstrates</h3>
+
+<p>
+  Beyond individual tool usage, this project demonstrates the ability to connect multiple DevOps components into a working application delivery process.
+</p>
+
+<p>
+  It covers source control integration, pipeline automation, reusable code, containerization, registry publishing, deployment, validation, troubleshooting, and operational notifications.
+</p>
+
+---
+
+<h2>25. Conclusion</h2>
+
+<p>
+  This project demonstrates the implementation of a Jenkins-based CI/CD workflow using a reusable Groovy Shared Library and Docker-based application deployment.
+</p>
+
+<p>
+  It brings together GitHub, Jenkins, Docker, Docker Compose, Docker Hub, ngrok, and Jenkins Credentials to automate the major steps involved in building, publishing, deploying, and validating a frontend and backend application.
+</p>
+
+<p>
+  The implementation also provides a foundation for further improvements in automated testing, security scanning, deployment strategies, monitoring, and production-grade reliability.
+</p>
+
+<p>
+  The overall objective is to make application delivery more consistent, repeatable, maintainable, and easier to troubleshoot.
+</p>
+
+<hr/>
+
+<p align="center">
+  <strong>Built with Jenkins • Groovy • Docker • Docker Compose • GitHub</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/12pavani/jenkins-gsl-profileApp">Jenkins Shared Library</a>
+  &nbsp; | &nbsp;
+  <a href="https://github.com/12pavani/Profile_App">Application Repository</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/12pavani">
+    <img src="https://img.shields.io/badge/GitHub-12pavani-181717?style=for-the-badge&amp;logo=github" alt="GitHub Profile"/>
+  </a>
+</p>
+
+<p align="center">
+  <em>Automate. Build. Ship. Validate. Improve.</em>
+</p>
