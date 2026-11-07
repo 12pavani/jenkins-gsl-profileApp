@@ -395,9 +395,13 @@
   The following technologies are used to implement and execute the CI/CD workflow.
 </p>
 
-<div align="center">
+<!-- <div align="center">
   <img src="https://skillicons.dev/icons?i=jenkins,groovy,git,github,docker,bash,linux,ngrok" alt="Technology stack icons" />
+</div> -->
+<div align="center">
+  <img src="https://vercel.app" alt="Technology stack icons" />
 </div>
+
 
 <table>
   <thead>
