@@ -2371,3 +2371,339 @@ Check Docker Availability
 Continue to Git Checkout</code></pre>
 
 <p><strong>Key takeaway:</strong> These initial operations prepare the Jenkins execution environment before any application code is downloaded or Docker image is built.</p>
+
+
+<h2>23. Git Checkout and Build Information</h2>
+
+<p>After preparing the Jenkins workspace and checking Docker availability, the next operation is retrieving the application source code from GitHub.</p>
+
+<p>The pipeline uses Git to download the Profile_App repository into the Jenkins workspace.</p>
+
+<h3>23.1 Understanding Git Checkout</h3>
+
+<p>Git checkout is the operation used by Jenkins to retrieve the required source code from a Git repository.</p>
+
+<p>In this project, Jenkins retrieves the application from:</p>
+
+<pre><code>https://github.com/12pavani/Profile_App.git</code></pre>
+
+<p>The pipeline uses the Jenkins <code>checkout</code> step with Git SCM configuration.</p>
+
+<h3>23.2 Understanding the Checkout Configuration</h3>
+
+<p>The application checkout follows this structure:</p>
+
+<pre><code>checkout([
+    $class: 'GitSCM',
+    branches: [[name: '*/main']],
+    userRemoteConfigs: [[
+        url: 'https://github.com/12pavani/Profile_App.git',
+        credentialsId: 'github-cred'
+    ]]
+])</code></pre>
+
+<p>Let's understand each component.</p>
+
+<h4>checkout</h4>
+
+<p><code>checkout</code> is a Jenkins Pipeline step used to retrieve source code from a configured source control repository.</p>
+
+<h4>$class: 'GitSCM'</h4>
+
+<p>This specifies that Jenkins should use its Git SCM implementation.</p>
+
+<p>SCM stands for Source Code Management.</p>
+
+<p>It identifies Git as the source control system used for this checkout.</p>
+
+<h4>branches: [[name: '*/main']]</h4>
+
+<p>This specifies the branch that Jenkins should check out.</p>
+
+<p>Here, <code>main</code> is the branch name.</p>
+
+<p>The <code>*</code> is used as a wildcard in the branch specification.</p>
+
+<p>In simple terms, Jenkins is instructed to retrieve the main branch from the configured Git repository.</p>
+
+<h4>userRemoteConfigs</h4>
+
+<p>This section defines the remote Git repository from which Jenkins retrieves source code.</p>
+
+<p>The repository URL is:</p>
+
+<pre><code>https://github.com/12pavani/Profile_App.git</code></pre>
+
+<h4>credentialsId</h4>
+
+<p>This identifies the Jenkins credential used for repository authentication, when required.</p>
+
+<pre><code>credentialsId: 'github-cred'</code></pre>
+
+<p>Jenkins retrieves the credential stored under this ID instead of requiring the username and token to be written directly in the pipeline code.</p>
+
+<h3>23.3 What Happens During Checkout?</h3>
+
+<p>When Jenkins executes the checkout step, the following operations take place:</p>
+
+<ol>
+  <li>Jenkins identifies the configured Git repository URL.</li>
+  <li>Jenkins establishes a connection with GitHub.</li>
+  <li>Jenkins authenticates if the repository requires credentials.</li>
+  <li>Jenkins retrieves the requested branch information.</li>
+  <li>Git downloads the required source code into the Jenkins workspace.</li>
+  <li>The application files become available for subsequent pipeline stages.</li>
+</ol>
+
+<p>After a successful checkout, the workspace contains the application repository structure.</p>
+
+<pre><code>Jenkins Workspace/
+|
++-- backend/
+|
++-- frontend/
+|
++-- docker-compose.yaml
+|
++-- package.json
+|
++-- package-lock.json</code></pre>
+
+<p>The exact files depend on the current contents of the GitHub repository.</p>
+
+<h3>23.4 Why Do We Need Git Checkout?</h3>
+
+<p>Jenkins cannot build the application if it does not have access to the application's source code and Docker build context.</p>
+
+<p>For example, the pipeline later executes:</p>
+
+<pre><code>docker build -t profile-frontend:${BUILD_NUMBER} frontend</code></pre>
+
+<p>For this command to work, the <code>frontend</code> directory must exist in the current working directory.</p>
+
+<p>Similarly:</p>
+
+<pre><code>docker build -t profile-backend:${BUILD_NUMBER} backend</code></pre>
+
+<p>requires the <code>backend</code> directory to be available.</p>
+
+<p>Git checkout makes these application files available inside the Jenkins workspace.</p>
+
+<h3>23.5 Understanding Git Branch Information</h3>
+
+<p>After checkout, the pipeline collects Git information using:</p>
+
+<pre><code>git branch --show-current</code></pre>
+
+<p>This command displays the name of the currently checked-out local branch.</p>
+
+<p>For example:</p>
+
+<pre><code>main</code></pre>
+
+<p><strong>Why is it useful?</strong></p>
+
+<ul>
+  <li>Identifies which branch was checked out.</li>
+  <li>Helps troubleshoot branch-related issues.</li>
+  <li>Provides visibility into the source version used for a build.</li>
+</ul>
+
+<p><strong>Important:</strong> Depending on how Jenkins performs checkout, the workspace may be in a detached HEAD state. In that situation, <code>git branch --show-current</code> can return an empty value. The command alone is therefore not a reliable way to identify the checked-out commit's source branch in every Jenkins configuration.</p>
+
+<h3>23.6 Understanding Git Commit Information</h3>
+
+<p>The pipeline also executes:</p>
+
+<pre><code>git rev-parse HEAD</code></pre>
+
+<p>This command displays the full commit hash of the currently checked-out Git revision.</p>
+
+<p>Example output:</p>
+
+<pre><code>7d9a3b2c8f1e4a5d6c7b8a9f0e1d2c3b4a5f6e7d</code></pre>
+
+<p>The displayed value is an illustrative example, not the actual commit hash of your repository.</p>
+
+<p><strong>What is a commit hash?</strong></p>
+
+<p>Whenever a developer commits changes to Git, Git creates a unique identifier for that commit.</p>
+
+<p>This identifier is called a commit hash.</p>
+
+<p>It helps identify the exact source code version used during a Jenkins build.</p>
+
+<p><strong>Why is this important?</strong></p>
+
+<ul>
+  <li>Helps trace which code version was deployed.</li>
+  <li>Supports debugging and troubleshooting.</li>
+  <li>Helps compare changes between builds.</li>
+  <li>Provides traceability for release management.</li>
+</ul>
+
+<h3>23.7 Understanding Git Commit History</h3>
+
+<p>The pipeline executes:</p>
+
+<pre><code>git log</code></pre>
+
+<p>This command displays the commit history of the checked-out repository.</p>
+
+<p>It typically includes:</p>
+
+<ul>
+  <li>Commit hash.</li>
+  <li>Author information.</li>
+  <li>Commit date.</li>
+  <li>Commit message.</li>
+</ul>
+
+<p>Example:</p>
+
+<pre><code>commit 7d9a3b2...
+Author: Developer
+Date:   Mon Nov 2 10:30:00 2026
+
+    Update profile application</code></pre>
+
+<p>This example illustrates the format of Git output.</p>
+
+<p><strong>Why do we need git log?</strong></p>
+
+<p>It provides information about the recent source code changes and helps identify which commits are associated with the current application version.</p>
+
+<h3>23.8 Understanding Jenkins Build Information</h3>
+
+<p>In addition to Git details, the pipeline collects Jenkins build information.</p>
+
+<p>The following environment variables are used:</p>
+
+<pre><code>JOB_NAME
+BUILD_NUMBER
+BUILD_URL
+NODE_NAME
+WORKSPACE</code></pre>
+
+<p>These variables are automatically provided by Jenkins.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Meaning</th>
+      <th>Example</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>JOB_NAME</code></td>
+      <td>Name of the Jenkins job.</td>
+      <td>Profile-App-CI-CD</td>
+    </tr>
+    <tr>
+      <td><code>BUILD_NUMBER</code></td>
+      <td>Unique build number within the job.</td>
+      <td>5</td>
+    </tr>
+    <tr>
+      <td><code>BUILD_URL</code></td>
+      <td>URL of the current Jenkins build.</td>
+      <td>http://localhost:8080/job/Profile-App-CI-CD/5/</td>
+    </tr>
+    <tr>
+      <td><code>NODE_NAME</code></td>
+      <td>Name of the Jenkins node executing the build.</td>
+      <td>Built-in node</td>
+    </tr>
+    <tr>
+      <td><code>WORKSPACE</code></td>
+      <td>Absolute path to the current job workspace.</td>
+      <td>/path/to/jenkins/workspace/Profile-App-CI-CD</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>The example values above are illustrative. Your actual values depend on your Jenkins configuration.</p>
+
+<h3>23.9 Understanding Each Jenkins Variable</h3>
+
+<h4>JOB_NAME</h4>
+
+<p>Identifies the Jenkins job currently executing.</p>
+
+<p>This is useful when the same Shared Library is reused by multiple jobs.</p>
+
+<h4>BUILD_NUMBER</h4>
+
+<p>Identifies the current build execution.</p>
+
+<p>For example, if Jenkins executes the job for the fifth time, the build number is:</p>
+
+<pre><code>5</code></pre>
+
+<p>This value is especially important in this project because it is used as the Docker image tag.</p>
+
+<h4>BUILD_URL</h4>
+
+<p>Provides the URL of the current Jenkins build.</p>
+
+<p>It allows users to open the build directly from the Jenkins dashboard.</p>
+
+<h4>NODE_NAME</h4>
+
+<p>Identifies the Jenkins node on which the pipeline is running.</p>
+
+<p>For example, a pipeline might run on the built-in Jenkins node or on a separately configured agent.</p>
+
+<h4>WORKSPACE</h4>
+
+<p>Identifies the directory where the pipeline is executing its file-related operations.</p>
+
+<p>This helps troubleshoot problems involving missing Dockerfiles, incorrect paths, or missing application directories.</p>
+
+<h3>23.10 Why Collect Git and Build Information?</h3>
+
+<p>Collecting this information improves build traceability.</p>
+
+<p>Suppose an application deployment has an issue. The team may need to identify:</p>
+
+<ul>
+  <li>Which Jenkins job executed the deployment?</li>
+  <li>Which build number was responsible?</li>
+  <li>Which Git commit was checked out?</li>
+  <li>Which node executed the pipeline?</li>
+  <li>Where was the application source code checked out?</li>
+</ul>
+
+<p>These details make troubleshooting and debugging easier.</p>
+
+<h3>23.11 Complete Execution Flow</h3>
+
+<pre><code>Prepare Jenkins Environment
+           |
+           v
+Clean Workspace
+           |
+           v
+Check Docker Availability
+           |
+           v
+Checkout Profile_App
+           |
+           v
+Retrieve Git Branch
+           |
+           v
+Retrieve Commit Hash
+           |
+           v
+Display Git History
+           |
+           v
+Collect Jenkins Metadata
+           |
+           v
+Proceed to Docker Image Build</code></pre>
+
+<p><strong>Key takeaway:</strong> Git checkout provides the application source code required for the build, while Git and Jenkins metadata help identify exactly which code and build execution are being processed.</p>
