@@ -987,3 +987,311 @@ docker compose up -d</code></pre>
 
 <p><strong>Interview point:</strong> A Jenkins Shared Library is a reusable collection of Groovy code that allows teams to centralize and share pipeline logic across multiple Jenkins jobs.</p>
 
+
+<h2>15. Configuring the Jenkins Shared Library</h2>
+
+<p>Before Jenkins can execute the reusable pipeline code stored in GitHub, we must tell Jenkins where the Shared Library repository is located and how to retrieve it.</p>
+
+<p>This configuration connects Jenkins with the <strong>jenkins-gsl-profileApp</strong> repository.</p>
+
+<h3>15.1 Why Do We Need to Configure a Shared Library?</h3>
+
+<p>Jenkins cannot automatically identify every GitHub repository as a Shared Library.</p>
+
+<p>We must configure the repository in Jenkins so that it knows:</p>
+
+<ul>
+  <li>Which GitHub repository contains the reusable pipeline code.</li>
+  <li>What name should be used to reference the library.</li>
+  <li>Which branch or version should be loaded.</li>
+  <li>Which credentials should be used to access the repository, if authentication is required.</li>
+</ul>
+
+<p>Once configured, Jenkins can load the library when a pipeline requests it.</p>
+
+<h3>15.2 Open Jenkins System Configuration</h3>
+
+<ol>
+  <li>Open the Jenkins dashboard.</li>
+  <li>Click <strong>Manage Jenkins</strong>.</li>
+  <li>Open <strong>System</strong> or <strong>Configure System</strong>, depending on your Jenkins version.</li>
+  <li>Scroll down to the <strong>Global Pipeline Libraries</strong> section.</li>
+  <li>Click <strong>Add</strong> to register a new Shared Library.</li>
+</ol>
+
+<p>This section allows Jenkins administrators to define libraries that can be reused by different pipeline jobs.</p>
+
+<h3>15.3 Configure the Shared Library Details</h3>
+
+<p>Use the following values as the configuration guide for this project. Confirm the actual default branch and repository visibility before saving.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Configuration</th>
+      <th>Value</th>
+      <th>Explanation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Name</td>
+      <td><code>jenkins-gsl-profileApp</code></td>
+      <td>The identifier used to refer to the library from a Jenkins pipeline.</td>
+    </tr>
+    <tr>
+      <td>Default version</td>
+      <td><code>main</code></td>
+      <td>The Git branch Jenkins should load by default, assuming the repository uses this branch.</td>
+    </tr>
+    <tr>
+      <td>Load implicitly</td>
+      <td>Unchecked</td>
+      <td>Allows the Jenkinsfile to explicitly request the library instead of loading it automatically for every pipeline.</td>
+    </tr>
+    <tr>
+      <td>Allow default version to be overridden</td>
+      <td>According to project requirements</td>
+      <td>Controls whether a pipeline can request another library version.</td>
+    </tr>
+    <tr>
+      <td>Retrieval method</td>
+      <td>Modern SCM</td>
+      <td>Uses the configured source control management system to retrieve the library.</td>
+    </tr>
+    <tr>
+      <td>SCM</td>
+      <td>Git</td>
+      <td>Identifies Git as the source control system.</td>
+    </tr>
+    <tr>
+      <td>Project Repository</td>
+      <td><code>https://github.com/12pavani/jenkins-gsl-profileApp.git</code></td>
+      <td>The GitHub URL of the Shared Library repository.</td>
+    </tr>
+    <tr>
+      <td>Credentials</td>
+      <td>Only if required</td>
+      <td>Authentication details for a private repository.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>15.4 Understanding the Name and Default Version</h3>
+
+<p><strong>Name:</strong></p>
+
+<p>The name is the identifier Jenkins uses when a pipeline requests the Shared Library.</p>
+
+<p>For example, if the configured name is:</p>
+
+<pre><code>jenkins-gsl-profileApp</code></pre>
+
+<p>A Jenkinsfile can request that library using:</p>
+
+<pre><code>@Library('jenkins-gsl-profileApp') _</code></pre>
+
+<p><strong>Default version:</strong></p>
+
+<p>The default version tells Jenkins which branch, tag, or commit to retrieve when the pipeline does not specify another version.</p>
+
+<p>For example:</p>
+
+<pre><code>main</code></pre>
+
+<p>This means Jenkins retrieves the library from the <code>main</code> branch by default.</p>
+
+<h3>15.5 Understanding Modern SCM</h3>
+
+<p>SCM stands for <strong>Source Code Management</strong>.</p>
+
+<p>It refers to the system used to store and manage source code versions. Git is one of the most commonly used SCM tools.</p>
+
+<p>Jenkins supports different ways of retrieving Shared Libraries. Modern SCM is the recommended configuration when the appropriate SCM plugin is available.</p>
+
+<p>In this project:</p>
+
+<pre><code>Jenkins
+   |
+   v
+Modern SCM
+   |
+   v
+Git
+   |
+   v
+GitHub Repository
+   |
+   v
+jenkins-gsl-profileApp</code></pre>
+
+<p>Jenkins uses this configuration to retrieve the Groovy library code from GitHub.</p>
+
+<h3>15.6 Configure Credentials If the Repository Is Private</h3>
+
+<p>If the Shared Library repository is private, Jenkins needs authentication to retrieve it.</p>
+
+<p>For a public repository, authentication may not be necessary for read access.</p>
+
+<p>If credentials are required, create an appropriate GitHub credential in Jenkins and select it in the Shared Library SCM configuration.</p>
+
+<p>Do not confuse these credentials with the Docker Hub credentials used later in the pipeline. They serve different purposes.</p>
+
+<h3>15.7 Save the Configuration</h3>
+
+<ol>
+  <li>Review the library name.</li>
+  <li>Verify the repository URL.</li>
+  <li>Check the default branch.</li>
+  <li>Verify the retrieval method and credentials.</li>
+  <li>Click <strong>Save</strong>.</li>
+</ol>
+
+<p>Jenkins now has the Shared Library configuration available to pipeline jobs.</p>
+
+<p><strong>Important:</strong> Registering the library does not automatically execute its methods. A pipeline must still load and invoke the appropriate library functionality.</p>
+
+<hr/>
+
+<h2>16. Loading and Invoking the Shared Library</h2>
+
+<p>After registering the Shared Library, the next step is to make its reusable pipeline code available to a Jenkins job.</p>
+
+<h3>16.1 What Does Loading a Shared Library Mean?</h3>
+
+<p>Loading a Shared Library means retrieving its Groovy code and making the library's available classes and pipeline steps accessible to the Jenkins pipeline.</p>
+
+<p>For example, the project contains a reusable method named:</p>
+
+<pre><code>BuildDeployPipeline()</code></pre>
+
+<p>This method contains the build and deployment workflow.</p>
+
+<p>The Jenkins pipeline must load the library and invoke the appropriate entry point for that workflow to execute.</p>
+
+<h3>16.2 The @Library Annotation</h3>
+
+<p>Jenkins provides the <code>@Library</code> annotation to load a Shared Library in a Jenkinsfile.</p>
+
+<p>For example, the following is an illustrative library-loading statement:</p>
+
+<pre><code>@Library('jenkins-gsl-profileApp') _</code></pre>
+
+<p>Here:</p>
+
+<ul>
+  <li><code>@Library</code> tells Jenkins to load a configured Shared Library.</li>
+  <li><code>'jenkins-gsl-profileApp'</code> is the library name registered in Jenkins.</li>
+  <li><code>_</code> is the wildcard import form used by Jenkins to make the library's global variables available.</li>
+</ul>
+
+<h3>16.3 Understanding the Package Declaration</h3>
+
+<p>The shared pipeline code supplied for this project uses the following package declaration:</p>
+
+<pre><code>package com.pavani.pipeline</code></pre>
+
+<p>A package groups related Groovy classes and helps organize the code.</p>
+
+<p>For example, if a class is defined inside this package, it can be referenced using its fully qualified class name:</p>
+
+<pre><code>com.pavani.pipeline.ClassName</code></pre>
+
+<p>The exact class name and the location of the <code>BuildDeployPipeline()</code> method must match the actual repository implementation.</p>
+
+<h3>16.4 Understanding the Difference Between a Class Method and a Global Pipeline Step</h3>
+
+<p>There are two common patterns for exposing reusable functionality in a Jenkins Shared Library.</p>
+
+<p><strong>Pattern 1: Class-based implementation under src/</strong></p>
+
+<p>Reusable Groovy classes are stored under the <code>src/</code> directory and can be imported into pipeline code.</p>
+
+<p><strong>Pattern 2: Global pipeline step under vars/</strong></p>
+
+<p>Groovy scripts stored under <code>vars/</code> can expose global pipeline steps that Jenkinsfiles invoke directly.</p>
+
+<p>For example, a file named <code>buildDeployPipeline.groovy</code> could expose a global step named <code>buildDeployPipeline()</code>.</p>
+
+<p>These patterns are not interchangeable automatically. The actual method and invocation must match the repository's implementation.</p>
+
+<h3>16.5 How the Application Pipeline Gets Executed</h3>
+
+<p>The expected high-level execution relationship is:</p>
+
+<pre><code>Jenkins Job
+    |
+    v
+Jenkinsfile
+    |
+    v
+Load Shared Library
+    |
+    v
+Invoke Pipeline Entry Point
+    |
+    v
+BuildDeployPipeline()
+    |
+    v
+Execute CI/CD Stages</code></pre>
+
+<p>The Jenkinsfile is the entry point for a Pipeline job. The Shared Library provides the reusable implementation.</p>
+
+<p><strong>Important project-specific verification:</strong> We have the implementation of <code>BuildDeployPipeline()</code>, but its exact class wrapper, global step wrapper, filename, and calling Jenkinsfile have not yet been established. Therefore, do not copy an assumed invocation example into the project without checking the actual files.</p>
+
+<hr/>
+
+<h2>17. Understanding the Jenkins Workspace</h2>
+
+<p>The Jenkins workspace is the directory where Jenkins performs the operations required by a particular job.</p>
+
+<p>For this project, the workspace is important because the pipeline checks out the application source code and executes Docker build commands from the workspace.</p>
+
+<h3>17.1 What Is a Workspace?</h3>
+
+<p>A workspace is a working directory allocated to a Jenkins job on the agent where the pipeline executes.</p>
+
+<p>It can contain:</p>
+
+<ul>
+  <li>Checked-out application source code.</li>
+  <li>Frontend and backend directories.</li>
+  <li>Dockerfiles and Compose configuration.</li>
+  <li>Temporary build files.</li>
+  <li>Generated logs and other build artifacts.</li>
+</ul>
+
+<h3>17.2 How the Workspace Is Used in This Project</h3>
+
+<p>The shared pipeline uses:</p>
+
+<pre><code>deleteDir()</code></pre>
+
+<p>This removes the current workspace contents before the application is checked out.</p>
+
+<p>Later, the pipeline executes the Git checkout operation to retrieve the Profile_App repository.</p>
+
+<p>Once checkout completes, the workspace contains the application source code needed for the Docker builds.</p>
+
+<h3>17.3 Understanding the WORKSPACE Environment Variable</h3>
+
+<p>Jenkins automatically provides an environment variable named <code>WORKSPACE</code>.</p>
+
+<p>It contains the absolute path to the current job's workspace.</p>
+
+<p>The project prints this value as part of its build information:</p>
+
+<pre><code>echo "Workspace: ${WORKSPACE}"</code></pre>
+
+<p>This is useful when troubleshooting file paths, Docker build contexts, and missing application files.</p>
+
+<h3>17.4 Why Workspace Cleanup Matters</h3>
+
+<p>Suppose a previous build generated temporary files or checked out an older version of the application.</p>
+
+<p>If the next build reuses the workspace without appropriate cleanup, unwanted files may remain and affect the new build.</p>
+
+<p>Using <code>deleteDir()</code> helps ensure that the next checkout starts with a clean workspace.</p>
+
+<p><strong>Important:</strong> Workspace cleanup removes files from the Jenkins workspace. It does not automatically delete Docker images, Docker containers, or data stored elsewhere on the machine.</p>
