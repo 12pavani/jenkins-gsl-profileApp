@@ -1621,3 +1621,389 @@ Execute CI/CD Stages</code></pre>
 </ul>
 
 <p><strong>Key takeaway:</strong> Jenkins Credentials provide a centralized way to manage sensitive information. The pipeline references credentials by ID and retrieves their values only when required.</p>
+
+
+<h2>20. Configuring GitHub Webhooks Using ngrok</h2>
+
+<p>In this project, Jenkins runs locally on the macOS machine. However, GitHub is an external service hosted on the internet.</p>
+
+<p>When a developer pushes new code to GitHub, GitHub needs a way to notify the local Jenkins server that a change has occurred.</p>
+
+<p>This is where <strong>GitHub Webhooks</strong> and <strong>ngrok</strong> are useful.</p>
+
+<h3>20.1 What Is a Webhook?</h3>
+
+<p>A webhook is a mechanism through which one application sends an HTTP request to another application when a particular event occurs.</p>
+
+<p>For example, when a developer pushes code to a GitHub repository, GitHub can send an HTTP POST request to a configured webhook URL.</p>
+
+<p>The receiving application can then process the event and perform an action.</p>
+
+<p>In this project:</p>
+
+<ul>
+  <li>GitHub is the event sender.</li>
+  <li>Jenkins is the event receiver.</li>
+  <li>A code push is the event that can trigger the notification.</li>
+  <li>Jenkins processes the webhook and starts the configured build, if the job is set up to respond to that event.</li>
+</ul>
+
+<h3>20.2 Why Do We Need ngrok?</h3>
+
+<p>Jenkins is running locally at:</p>
+
+<pre><code>http://localhost:8080</code></pre>
+
+<p>The word <code>localhost</code> refers to the current machine. GitHub cannot directly access this local address from its servers.</p>
+
+<p>To solve this problem, we use ngrok.</p>
+
+<p>ngrok creates a secure tunnel between a public URL and a service running on the local machine.</p>
+
+<p>For this project, ngrok forwards incoming public HTTP requests to the local Jenkins server.</p>
+
+<h3>20.3 Understanding the Webhook Architecture</h3>
+
+<pre><code>+----------------------+
+|       Developer      |
+|                      |
+|   Pushes code to     |
+|       GitHub         |
++----------+-----------+
+           |
+           | GitHub webhook
+           | HTTP POST
+           v
++----------------------+
+|        ngrok         |
+|                      |
+|    Public HTTPS URL  |
++----------+-----------+
+           |
+           | Tunnel forwards
+           | request to port 8080
+           v
++----------------------+
+|       Jenkins        |
+|                      |
+|   Local macOS        |
+|   Port 8080          |
++----------+-----------+
+           |
+           v
++----------------------+
+|   Jenkins Pipeline   |
+|                      |
+|   Executes CI/CD     |
++----------------------+</code></pre>
+
+<h3>20.4 Install ngrok</h3>
+
+<p>ngrok can be installed on macOS using Homebrew.</p>
+
+<pre><code>brew install ngrok</code></pre>
+
+<p>Verify the installation:</p>
+
+<pre><code>ngrok version</code></pre>
+
+<h3>20.5 Configure Your ngrok Account</h3>
+
+<ol>
+  <li>Create an account on the official ngrok website.</li>
+  <li>Open your ngrok dashboard.</li>
+  <li>Locate your authentication token.</li>
+  <li>Copy the token securely.</li>
+  <li>Configure ngrok using the command shown in your account dashboard.</li>
+</ol>
+
+<p>The command generally follows this format:</p>
+
+<pre><code>ngrok config add-authtoken YOUR_AUTH_TOKEN</code></pre>
+
+<p>Replace <code>YOUR_AUTH_TOKEN</code> with your actual token. Never commit this token to GitHub or share it publicly.</p>
+
+<h3>20.6 Start Jenkins Before Starting ngrok</h3>
+
+<p>Make sure Jenkins is running locally before creating the tunnel.</p>
+
+<p>Open your browser and verify:</p>
+
+<pre><code>http://localhost:8080</code></pre>
+
+<p>Once Jenkins is accessible, open another Terminal window and execute:</p>
+
+<pre><code>ngrok http 8080</code></pre>
+
+<p><strong>What does this command mean?</strong></p>
+
+<ul>
+  <li><code>ngrok</code> starts the ngrok tunneling application.</li>
+  <li><code>http</code> tells ngrok to create an HTTP tunnel.</li>
+  <li><code>8080</code> identifies the local port where Jenkins is listening.</li>
+</ul>
+
+<p>ngrok displays a public forwarding URL. It may look similar to:</p>
+
+<pre><code>Forwarding
+https://example-random.ngrok-free.app
+    -> http://localhost:8080</code></pre>
+
+<p>The actual URL will be different for your session.</p>
+
+<p>Keep the ngrok Terminal window open while you need the tunnel. Stopping ngrok or closing the process disconnects the public endpoint.</p>
+
+<h3>20.7 Configure the GitHub Webhook</h3>
+
+<p>Now that Jenkins has a public URL, configure GitHub to send webhook events to it.</p>
+
+<ol>
+  <li>Open the <strong>Profile_App</strong> repository on GitHub.</li>
+  <li>Navigate to <strong>Settings</strong>.</li>
+  <li>Select <strong>Webhooks</strong>.</li>
+  <li>Click <strong>Add webhook</strong>.</li>
+  <li>Enter the ngrok public URL followed by the Jenkins webhook endpoint.</li>
+  <li>Select <strong>application/json</strong> as the content type.</li>
+  <li>Select the events that should trigger notifications. For a basic setup, select push events.</li>
+  <li>Save the webhook.</li>
+</ol>
+
+<p>The URL commonly used with the Jenkins GitHub plugin is:</p>
+
+<pre><code>https://YOUR-NGROK-URL/github-webhook/</code></pre>
+
+<p>For example:</p>
+
+<pre><code>https://example-random.ngrok-free.app/github-webhook/</code></pre>
+
+<p>Use your current ngrok forwarding URL, not the example URL above.</p>
+
+<h3>20.8 Configure Jenkins to Receive GitHub Push Events</h3>
+
+<p>Creating the webhook in GitHub is only one side of the configuration. The Jenkins job must also be configured to respond to the webhook.</p>
+
+<p>For a Pipeline job using the GitHub plugin:</p>
+
+<ol>
+  <li>Open the Jenkins dashboard.</li>
+  <li>Open the relevant Pipeline job.</li>
+  <li>Click <strong>Configure</strong>.</li>
+  <li>Locate the Build Triggers section.</li>
+  <li>Select <strong>GitHub hook trigger for GITScm polling</strong>, if this is the trigger mechanism being used.</li>
+  <li>Save the configuration.</li>
+</ol>
+
+<p>The exact trigger configuration depends on the Jenkins job type and the plugins installed.</p>
+
+<h3>20.9 Test the GitHub Webhook</h3>
+
+<p>After completing the configuration, test whether GitHub can communicate with Jenkins.</p>
+
+<ol>
+  <li>Open the Profile_App GitHub repository.</li>
+  <li>Navigate to Settings → Webhooks.</li>
+  <li>Open the configured webhook.</li>
+  <li>Review the Recent Deliveries section.</li>
+  <li>Check whether GitHub received a successful response from the endpoint.</li>
+  <li>Push a small test change to the configured branch.</li>
+  <li>Check whether Jenkins receives the event and starts the expected job.</li>
+</ol>
+
+<p><strong>Important distinction:</strong> A successful webhook delivery only confirms that the endpoint responded successfully. It does not, by itself, prove that the Jenkins job was configured correctly or that the build completed successfully.</p>
+
+<h3>20.10 Common Webhook Problems</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Problem</th>
+      <th>Possible Reason</th>
+      <th>What to Check</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Connection refused</td>
+      <td>Jenkins is not running.</td>
+      <td>Open localhost:8080 and check Jenkins.</td>
+    </tr>
+    <tr>
+      <td>Webhook delivery fails</td>
+      <td>ngrok is stopped or the URL is incorrect.</td>
+      <td>Check the active ngrok forwarding URL.</td>
+    </tr>
+    <tr>
+      <td>Webhook succeeds but no build starts</td>
+      <td>The Jenkins job trigger is not configured or the event does not match.</td>
+      <td>Check the job's Build Triggers configuration.</td>
+    </tr>
+    <tr>
+      <td>Old webhook URL</td>
+      <td>The ngrok URL changed after restarting the tunnel.</td>
+      <td>Update the URL in GitHub.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Security note:</strong> Exposing Jenkins through a public tunnel should be done carefully. Use Jenkins authentication, keep Jenkins updated, protect webhook endpoints appropriately, and avoid exposing unnecessary services.</p>
+
+<hr/>
+
+<h2>21. Creating and Configuring the Jenkins Pipeline Job</h2>
+
+<p>After configuring the Shared Library, plugins, credentials, and webhook, we need a Jenkins job that executes the application pipeline.</p>
+
+<h3>21.1 What Is a Jenkins Job?</h3>
+
+<p>A Jenkins job is a configured unit of work that Jenkins can execute.</p>
+
+<p>For example, a job can:</p>
+
+<ul>
+  <li>Download source code.</li>
+  <li>Compile or build an application.</li>
+  <li>Run tests.</li>
+  <li>Build Docker images.</li>
+  <li>Deploy containers.</li>
+  <li>Send notifications.</li>
+</ul>
+
+<p>In this project, the Jenkins job is responsible for triggering the reusable Shared Library pipeline.</p>
+
+<h3>21.2 Create a New Pipeline Job</h3>
+
+<ol>
+  <li>Open the Jenkins dashboard.</li>
+  <li>Click <strong>New Item</strong>.</li>
+  <li>Enter a suitable job name, such as <code>Profile-App-CI-CD</code>.</li>
+  <li>Select <strong>Pipeline</strong> as the job type.</li>
+  <li>Click <strong>OK</strong>.</li>
+</ol>
+
+<p>Jenkins creates a new Pipeline job and opens its configuration page.</p>
+
+<h3>21.3 Understanding the Pipeline Job Configuration</h3>
+
+<p>A Pipeline job can obtain its pipeline definition in different ways.</p>
+
+<p>For example:</p>
+
+<ul>
+  <li>Pipeline script: The script is entered directly into the Jenkins configuration.</li>
+  <li>Pipeline script from SCM: Jenkins retrieves the Jenkinsfile from a source code repository.</li>
+</ul>
+
+<p>Because this project uses a Shared Library, the pipeline entry point must load and invoke that library.</p>
+
+<h3>21.4 Pipeline Script from SCM</h3>
+
+<p>If the Jenkinsfile is stored in a Git repository, select:</p>
+
+<pre><code>Definition: Pipeline script from SCM</code></pre>
+
+<p>Then configure the source control settings:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Configuration</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>SCM</td>
+      <td>Git</td>
+    </tr>
+    <tr>
+      <td>Repository URL</td>
+      <td>The repository containing the Jenkinsfile.</td>
+    </tr>
+    <tr>
+      <td>Credentials</td>
+      <td>Appropriate GitHub credential, if required.</td>
+    </tr>
+    <tr>
+      <td>Branch Specifier</td>
+      <td>The branch containing the Jenkinsfile.</td>
+    </tr>
+    <tr>
+      <td>Script Path</td>
+      <td>The actual path to the Jenkinsfile.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Important:</strong> The application checkout inside <code>BuildDeployPipeline()</code> is separate from the retrieval of the Jenkinsfile. Do not assume that the application repository is automatically the correct location for the Jenkinsfile.</p>
+
+<h3>21.5 Configure the Build Trigger</h3>
+
+<p>If you want GitHub pushes to trigger the pipeline automatically, configure the appropriate webhook trigger.</p>
+
+<p>For a job using the GitHub plugin, this may be:</p>
+
+<pre><code>GitHub hook trigger for GITScm polling</code></pre>
+
+<p>Save the configuration after enabling the trigger.</p>
+
+<h3>21.6 Configure the Pipeline Entry Point</h3>
+
+<p>The Jenkins job must execute a Jenkinsfile or pipeline script that loads the configured Shared Library and invokes the pipeline entry point.</p>
+
+<p>The project-specific implementation should be verified before adding the final Jenkinsfile code.</p>
+
+<p>The following is only a conceptual illustration of the flow:</p>
+
+<pre><code>Load configured Shared Library
+          |
+          v
+Resolve pipeline entry point
+          |
+          v
+Invoke BuildDeployPipeline()
+          |
+          v
+Run build and deployment workflow</code></pre>
+
+<p>The actual invocation syntax depends on whether the method is exposed through a class under <code>src/</code> or a global step under <code>vars/</code>.</p>
+
+<h3>21.7 Save the Job</h3>
+
+<ol>
+  <li>Review the job configuration.</li>
+  <li>Verify the Jenkinsfile source and path, if using SCM.</li>
+  <li>Verify the Shared Library name and availability.</li>
+  <li>Check the webhook trigger configuration, if required.</li>
+  <li>Click <strong>Save</strong>.</li>
+</ol>
+
+<h3>21.8 Run the First Build Manually</h3>
+
+<p>Before relying on GitHub webhooks, it is useful to test the pipeline manually.</p>
+
+<ol>
+  <li>Open the newly created Jenkins job.</li>
+  <li>Click <strong>Build Now</strong> or <strong>Build with Parameters</strong>, depending on the job configuration.</li>
+  <li>Open the build from the Build History section.</li>
+  <li>Click <strong>Console Output</strong>.</li>
+  <li>Observe the execution logs.</li>
+</ol>
+
+<p>The console output helps identify errors in Shared Library loading, Git checkout, Docker commands, credentials, or deployment.</p>
+
+<h3>21.9 Understanding Build History</h3>
+
+<p>Jenkins maintains a history of previous builds.</p>
+
+<p>Each build receives a unique build number within that job.</p>
+
+<p>For example:</p>
+
+<pre><code>Build #1
+Build #2
+Build #3
+Build #4</code></pre>
+
+<p>In this project, the build number is used when tagging Docker images. This helps distinguish images created by different Jenkins executions.</p>
+
+<p><strong>Key takeaway:</strong> The Jenkins job is the execution entry point. It loads the Shared Library, invokes the reusable pipeline, and provides the interface to monitor the CI/CD process.</p>
