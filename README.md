@@ -819,11 +819,3 @@ git clone https://github.com/12pavani/jenkins-gsl-profileApp.git</code></pre>
 </p>
 
 <hr/>
-
-<div align="center">
-  <p><strong>Project foundation established.</strong></p>
-  <p>
-    <img src="https://img.shields.io/badge/Next-Jenkins%20Pipeline%20Integration-blue?style=for-the-badge&logo=jenkins" alt="Next documentation section"/>
-  </p>
-  <p><em>The next documentation sections continue with Jenkins Shared Library configuration, pipeline invocation, GitHub webhooks, credentials, and the actual CI/CD implementation.</em></p>
-</div>
