@@ -2707,3 +2707,429 @@ Collect Jenkins Metadata
 Proceed to Docker Image Build</code></pre>
 
 <p><strong>Key takeaway:</strong> Git checkout provides the application source code required for the build, while Git and Jenkins metadata help identify exactly which code and build execution are being processed.</p>
+
+
+<h2>24. Docker Image Building, Verification and Tagging</h2>
+
+<p>After Jenkins successfully checks out the application source code from GitHub, the next step is to build Docker images for the frontend and backend applications.</p>
+
+<p>In this project, the frontend and backend are built as two separate Docker images.</p>
+
+<h3>24.1 What Is a Docker Image?</h3>
+
+<p>A Docker image is a packaged version of an application that contains everything required to run it.</p>
+
+<p>It can include:</p>
+
+<ul>
+  <li>Application source code.</li>
+  <li>Runtime environment.</li>
+  <li>Required dependencies and libraries.</li>
+  <li>Configuration files.</li>
+  <li>Startup instructions.</li>
+</ul>
+
+<p>Think of a Docker image as a ready-to-run package of your application.</p>
+
+<p>Instead of installing dependencies and configuring the application manually on every machine, Docker allows you to package the application into an image and run it as a container.</p>
+
+<h3>24.2 Why Are We Building Two Separate Images?</h3>
+
+<p>Your Profile App contains two major components:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Component</th>
+      <th>Responsibility</th>
+      <th>Port</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Frontend</td>
+      <td>User interface that users interact with.</td>
+      <td>3000</td>
+    </tr>
+    <tr>
+      <td>Backend</td>
+      <td>Handles application logic and profile API requests.</td>
+      <td>8000</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Both components have different source code, dependencies, and runtime requirements.</p>
+
+<p>Therefore, we package them independently.</p>
+
+<p><strong>Frontend image:</strong> Contains the frontend application and its required dependencies.</p>
+
+<p><strong>Backend image:</strong> Contains the backend application and its required dependencies.</p>
+
+<p>This separation makes it easier to build, deploy, update, and troubleshoot each component independently.</p>
+
+<h3>24.3 Understanding the Docker Build Command</h3>
+
+<p>The pipeline executes the following command to build the frontend image:</p>
+
+<pre><code>docker build -t profile-frontend:${BUILD_NUMBER} frontend</code></pre>
+
+<p>Let's understand each component.</p>
+
+<h4>docker build</h4>
+
+<p>This tells Docker to build an image using the instructions provided in a Dockerfile.</p>
+
+<h4>-t</h4>
+
+<p>The <code>-t</code> option means tag.</p>
+
+<p>It assigns a name and tag to the newly created image.</p>
+
+<h4>profile-frontend</h4>
+
+<p>This is the name of the Docker image.</p>
+
+<p>It identifies the frontend application image.</p>
+
+<h4>${BUILD_NUMBER}</h4>
+
+<p>This is a Jenkins environment variable containing the current build number.</p>
+
+<p>For example, if the current Jenkins build number is 5, the command becomes:</p>
+
+<pre><code>docker build -t profile-frontend:5 frontend</code></pre>
+
+<p>The image is assigned the tag <code>5</code>.</p>
+
+<h4>frontend</h4>
+
+<p>This is the Docker build context directory.</p>
+
+<p>The build context tells Docker which directory contains the files needed to build the image.</p>
+
+<p>Docker uses the Dockerfile and other required files from this directory.</p>
+
+<h3>24.4 What Happens Internally During Docker Build?</h3>
+
+<p>When Jenkins executes the Docker build command, Docker performs several operations:</p>
+
+<ol>
+  <li>Reads the Dockerfile from the specified build context.</li>
+  <li>Processes the instructions in the Dockerfile.</li>
+  <li>Downloads the required base image if it is not available locally.</li>
+  <li>Installs application dependencies as instructed by the Dockerfile.</li>
+  <li>Copies application files into the image.</li>
+  <li>Creates the image layers.</li>
+  <li>Produces the final Docker image with the requested name and tag.</li>
+</ol>
+
+<p>For example, a Dockerfile might contain instructions such as:</p>
+
+<pre><code>FROM node:20
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+EXPOSE 3000
+CMD ["npm", "start"]</code></pre>
+
+<p>This is an illustrative example of a Node.js frontend Dockerfile. Your actual Dockerfile instructions determine how your application is packaged.</p>
+
+<h3>24.5 Building the Backend Image</h3>
+
+<p>After building the frontend image, Jenkins builds the backend image.</p>
+
+<pre><code>docker build -t profile-backend:${BUILD_NUMBER} backend</code></pre>
+
+<p>For build number 5, this becomes:</p>
+
+<pre><code>docker build -t profile-backend:5 backend</code></pre>
+
+<p>The build process is similar to the frontend build, but Docker uses the backend directory as its build context.</p>
+
+<p>This ensures that backend dependencies and application files are packaged separately from the frontend.</p>
+
+<h3>24.6 Why Use BUILD_NUMBER as the Image Tag?</h3>
+
+<p>Docker image tags help identify different versions of an application.</p>
+
+<p>Instead of repeatedly overwriting an image with the same tag, this pipeline uses the Jenkins build number as the image version.</p>
+
+<p>For example:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Jenkins Build</th>
+      <th>Frontend Image</th>
+      <th>Backend Image</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Build 1</td>
+      <td>profile-frontend:1</td>
+      <td>profile-backend:1</td>
+    </tr>
+    <tr>
+      <td>Build 2</td>
+      <td>profile-frontend:2</td>
+      <td>profile-backend:2</td>
+    </tr>
+    <tr>
+      <td>Build 3</td>
+      <td>profile-frontend:3</td>
+      <td>profile-backend:3</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Benefits:</strong></p>
+
+<ul>
+  <li>Each build gets its own image tag.</li>
+  <li>Previous versions can be identified.</li>
+  <li>It becomes easier to trace deployments to Jenkins builds.</li>
+  <li>Frontend and backend versions can be matched to the same build number.</li>
+</ul>
+
+<p>However, keeping a unique tag does not automatically guarantee that the image remains available forever. Image retention and cleanup policies also matter.</p>
+
+<h3>24.7 Verifying the Docker Images</h3>
+
+<p>After building both images, the pipeline verifies that the images exist locally.</p>
+
+<p>The verification command is:</p>
+
+<pre><code>docker images | grep "profile"</code></pre>
+
+<p>Let's break it down.</p>
+
+<h4>docker images</h4>
+
+<p>Displays the Docker images available on the local Docker host.</p>
+
+<p>It typically displays:</p>
+
+<ul>
+  <li>Repository name.</li>
+  <li>Image tag.</li>
+  <li>Image ID.</li>
+  <li>Creation time.</li>
+  <li>Image size.</li>
+</ul>
+
+<h4>| (Pipe Operator)</h4>
+
+<p>The pipe operator passes the output of one command as input to another command.</p>
+
+<p>Here, the output of <code>docker images</code> is passed to <code>grep</code>.</p>
+
+<h4>grep "profile"</h4>
+
+<p><code>grep</code> searches the supplied output for lines containing the word <code>profile</code>.</p>
+
+<p>This helps filter the output and display the Profile App images.</p>
+
+<p>Example output:</p>
+
+<pre><code>REPOSITORY          TAG    IMAGE ID       CREATED         SIZE
+profile-frontend    5      abc123456789   2 minutes ago   250MB
+profile-backend     5      def987654321   1 minute ago    180MB</code></pre>
+
+<p>The image IDs and sizes above are illustrative.</p>
+
+<p><strong>Important:</strong> This command filters the image listing. It is useful for visibility, but it is not a strict assertion that both images exist. A more robust pipeline could explicitly check for each expected image and fail if either is missing.</p>
+
+<h3>24.8 Why Do We Need Image Verification?</h3>
+
+<p>Imagine the frontend image builds successfully but the backend image build fails.</p>
+
+<p>If the pipeline continues without checking the results, later stages may fail when trying to tag or push the missing backend image.</p>
+
+<p>Verification helps identify image-related problems before proceeding to the publishing stage.</p>
+
+<p>Common Docker build failures include:</p>
+
+<ul>
+  <li>Dockerfile missing from the build context.</li>
+  <li>Incorrect directory path.</li>
+  <li>Dependency installation failure.</li>
+  <li>Network issues while downloading base images.</li>
+  <li>Insufficient disk space.</li>
+  <li>Invalid Dockerfile instructions.</li>
+</ul>
+
+<h3>24.9 Tagging Images for Docker Hub</h3>
+
+<p>After building and verifying the local images, the pipeline assigns Docker Hub repository names to them.</p>
+
+<p>The frontend tagging command is:</p>
+
+<pre><code>docker tag profile-frontend:${BUILD_NUMBER} vislavathpavani5123/profile-frontend:${BUILD_NUMBER}</code></pre>
+
+<p>The backend tagging command is:</p>
+
+<pre><code>docker tag profile-backend:${BUILD_NUMBER} vislavathpavani5123/profile-backend:${BUILD_NUMBER}</code></pre>
+
+<p>Let's understand the syntax.</p>
+
+<pre><code>docker tag SOURCE_IMAGE TARGET_IMAGE</code></pre>
+
+<ul>
+  <li><code>docker tag</code>: Assigns another name or tag to an existing local image.</li>
+  <li><code>SOURCE_IMAGE</code>: The image that was built locally.</li>
+  <li><code>TARGET_IMAGE</code>: The repository name and tag that will be used for publishing.</li>
+</ul>
+
+<p>In this project, the Docker Hub username is:</p>
+
+<pre><code>vislavathpavani5123</code></pre>
+
+<p>The resulting image names for build number 5 are:</p>
+
+<pre><code>vislavathpavani5123/profile-frontend:5
+
+vislavathpavani5123/profile-backend:5</code></pre>
+
+<h3>24.10 Why Is Docker Tag Required?</h3>
+
+<p>The local image initially has a name such as:</p>
+
+<pre><code>profile-frontend:5</code></pre>
+
+<p>But Docker Hub requires the image to be associated with the appropriate Docker Hub namespace and repository.</p>
+
+<p>Therefore, we tag it as:</p>
+
+<pre><code>vislavathpavani5123/profile-frontend:5</code></pre>
+
+<p>This does not rebuild or duplicate the image. Docker creates another reference to the same local image.</p>
+
+<p>The image can now be pushed to the corresponding Docker Hub repository.</p>
+
+<h3>24.11 Understanding the Complete Image Lifecycle</h3>
+
+<pre><code>GitHub Repository
+       |
+       v
+Jenkins Git Checkout
+       |
+       v
+Application Source Code
+       |
+       +----------------------+
+       |                      |
+       v                      v
+Frontend Directory      Backend Directory
+       |                      |
+       v                      v
+Docker Build             Docker Build
+       |                      |
+       v                      v
+profile-frontend:5       profile-backend:5
+       |                      |
+       +----------+-----------+
+                  |
+                  v
+          Verify Docker Images
+                  |
+                  v
+          Tag Images for Docker Hub
+                  |
+                  v
+  vislavathpavani5123/profile-frontend:5
+  vislavathpavani5123/profile-backend:5
+                  |
+                  v
+          Ready for Docker Hub Push</code></pre>
+
+<h3>24.12 Common Errors and Troubleshooting</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Error</th>
+      <th>Possible reason</th>
+      <th>What to check</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Dockerfile not found</td>
+      <td>Incorrect build context or missing Dockerfile.</td>
+      <td>Check the frontend or backend directory.</td>
+    </tr>
+    <tr>
+      <td>Cannot connect to Docker daemon</td>
+      <td>Docker Desktop is not running or Jenkins cannot access Docker.</td>
+      <td>Run <code>docker info</code>.</td>
+    </tr>
+    <tr>
+      <td>npm install failed</td>
+      <td>Dependency or network issue.</td>
+      <td>Check package files and build logs.</td>
+    </tr>
+    <tr>
+      <td>No space left on device</td>
+      <td>Insufficient disk space.</td>
+      <td>Check Docker disk usage.</td>
+    </tr>
+    <tr>
+      <td>Image not found</td>
+      <td>Image build failed or an incorrect tag was used.</td>
+      <td>Run <code>docker images</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Useful troubleshooting commands:</p>
+
+<pre><code># Check Docker availability
+docker info
+
+# List local Docker images
+docker images
+
+# List images related to Profile App
+docker images | grep profile
+
+# Check Docker disk usage
+docker system df
+
+# Inspect a specific image
+docker image inspect profile-frontend:${BUILD_NUMBER}</code></pre>
+
+<h3>24.13 Interview Questions</h3>
+
+<p><strong>Q1. What is the difference between a Docker image and a Docker container?</strong></p>
+
+<p>An image is the packaged application template. A container is a running or created instance of that image.</p>
+
+<p><strong>Q2. Why are frontend and backend built as separate Docker images?</strong></p>
+
+<p>They have different responsibilities, dependencies, and runtime requirements. Separate images allow independent builds and deployments.</p>
+
+<p><strong>Q3. What does the -t option do in docker build?</strong></p>
+
+<p>It assigns a repository name and tag to the image being built.</p>
+
+<p><strong>Q4. Does docker tag create a new Docker image?</strong></p>
+
+<p>No. It creates another reference to an existing local image. It does not rebuild the image.</p>
+
+<p><strong>Q5. Why use Jenkins BUILD_NUMBER as the Docker image tag?</strong></p>
+
+<p>It provides a build-specific version identifier, making it easier to trace an image back to its Jenkins build.</p>
+
+<p><strong>Q6. What is a Docker build context?</strong></p>
+
+<p>It is the set of files made available to Docker during an image build. In this project, <code>frontend</code> and <code>backend</code> are separate build contexts.</p>
+
+<p><strong>Q7. Does docker images | grep profile prove that both images exist?</strong></p>
+
+<p>Not necessarily. It displays matching image entries, but a robust pipeline should explicitly verify that both expected image names and tags exist.</p>
+
+<p><strong>Key takeaway:</strong> Jenkins builds two independent Docker images, verifies their presence, and tags them with the Docker Hub namespace and Jenkins build number. These tagged images are now ready to be uploaded to Docker Hub.</p>
