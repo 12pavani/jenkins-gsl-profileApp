@@ -2007,3 +2007,367 @@ Build #4</code></pre>
 <p>In this project, the build number is used when tagging Docker images. This helps distinguish images created by different Jenkins executions.</p>
 
 <p><strong>Key takeaway:</strong> The Jenkins job is the execution entry point. It loads the Shared Library, invokes the reusable pipeline, and provides the interface to monitor the CI/CD process.</p>
+
+
+<h2>22. Understanding the Shared Library Pipeline Code</h2>
+
+<p>The Jenkins Shared Library contains the main CI/CD implementation for this project.</p>
+
+<p>The reusable method supplied for this project is:</p>
+
+<pre><code>BuildDeployPipeline()</code></pre>
+
+<p>This method coordinates the complete application lifecycle, from preparing the Jenkins workspace to building Docker images, pushing them to Docker Hub, deploying containers, performing health checks, and sending email notifications.</p>
+
+<h3>22.1 Understanding the Overall Pipeline Structure</h3>
+
+<p>Before studying individual stages, understand the overall structure of the method.</p>
+
+<p>The pipeline follows this general execution flow:</p>
+
+<pre><code>BuildDeployPipeline()
+        |
+        v
+Initialize Pipeline
+        |
+        v
+Set Timeout and Timestamps
+        |
+        v
+Allocate Jenkins Node
+        |
+        v
+Prepare Build Information
+        |
+        v
+Clean Workspace
+        |
+        v
+Check Docker Availability
+        |
+        v
+Checkout Application Code
+        |
+        v
+Collect Git and Build Information
+        |
+        v
+Build Docker Images
+        |
+        v
+Verify Docker Images
+        |
+        v
+Tag Docker Images
+        |
+        v
+Authenticate with Docker Hub
+        |
+        v
+Push Docker Images
+        |
+        v
+Deploy with Docker Compose
+        |
+        v
+Perform Health Checks
+        |
+        v
+Archive Container Logs
+        |
+        v
+Clean Unused Docker Images
+        |
+        v
+Send Email Notification</code></pre>
+
+<h3>22.2 Understanding the Pipeline Method</h3>
+
+<p>The pipeline method is defined using Groovy syntax.</p>
+
+<p>The method name is:</p>
+
+<pre><code>BuildDeployPipeline()</code></pre>
+
+<p><strong>What is a method?</strong></p>
+
+<p>A method is a reusable block of code that performs a particular task.</p>
+
+<p>Instead of writing the same sequence of commands repeatedly, we place the logic inside a method and invoke it whenever required.</p>
+
+<p>In this project, the method groups all the CI/CD operations into one reusable implementation.</p>
+
+<h3>22.3 Understanding the timeout() Step</h3>
+
+<p>The pipeline starts with a timeout configuration:</p>
+
+<pre><code>timeout(time: 20, unit: 'MINUTES')</code></pre>
+
+<p><strong>What does timeout mean?</strong></p>
+
+<p>A timeout defines the maximum time allowed for a particular block of pipeline execution.</p>
+
+<p>Here:</p>
+
+<ul>
+  <li><code>time: 20</code> defines the duration.</li>
+  <li><code>unit: 'MINUTES'</code> specifies that the duration is measured in minutes.</li>
+</ul>
+
+<p>Therefore, the enclosed pipeline execution is allowed a maximum of 20 minutes.</p>
+
+<p>If the timeout is exceeded, Jenkins aborts the timed-out execution and reports a timeout failure.</p>
+
+<p><strong>Why is it useful?</strong></p>
+
+<ul>
+  <li>Prevents builds from running indefinitely.</li>
+  <li>Helps identify commands that are stuck.</li>
+  <li>Prevents unnecessary consumption of Jenkins resources.</li>
+  <li>Provides a predictable maximum execution time.</li>
+</ul>
+
+<p><strong>Example:</strong> If a Docker image push gets stuck because of a network issue, the timeout helps prevent the pipeline from waiting forever.</p>
+
+<h3>22.4 Understanding timestamps()</h3>
+
+<p>The pipeline also uses:</p>
+
+<pre><code>timestamps</code></pre>
+
+<p>This enables timestamps in Jenkins console logs.</p>
+
+<p>Without timestamps, console output might look like:</p>
+
+<pre><code>Checking Docker...
+Building frontend...
+Building backend...</code></pre>
+
+<p>With timestamps enabled, the output includes the time associated with each log line:</p>
+
+<pre><code>18:20:01 Checking Docker...
+18:20:04 Building frontend...
+18:21:15 Building backend...</code></pre>
+
+<p>The actual timestamp format depends on the Jenkins configuration.</p>
+
+<p><strong>Why are timestamps useful?</strong></p>
+
+<ul>
+  <li>Help identify how long each operation takes.</li>
+  <li>Make troubleshooting easier.</li>
+  <li>Help correlate Jenkins logs with Docker and application logs.</li>
+  <li>Make it easier to identify when a pipeline became stuck.</li>
+</ul>
+
+<h3>22.5 Understanding node()</h3>
+
+<p>The pipeline uses:</p>
+
+<pre><code>node {
+    // Pipeline execution
+}</code></pre>
+
+<p>The <code>node</code> step allocates a Jenkins executor on an available agent and provides a workspace for the enclosed steps.</p>
+
+<p>In a simple local Jenkins setup, the controller may also execute builds if it is configured to allow that.</p>
+
+<p>In this project, the commands execute on the machine where the selected Jenkins executor runs.</p>
+
+<p>This is important because that machine must have access to:</p>
+
+<ul>
+  <li>The Docker CLI.</li>
+  <li>The Docker daemon.</li>
+  <li>The Git executable.</li>
+  <li>The required application files.</li>
+  <li>The network connections needed for GitHub and Docker Hub.</li>
+</ul>
+
+<p><strong>Important:</strong> A Jenkins agent is the machine or execution environment where pipeline steps run. It is not the same thing as a Docker container, although an agent can itself run inside a container.</p>
+
+<h3>22.6 Understanding the Build Variables</h3>
+
+<p>Inside the pipeline, the following variables are defined:</p>
+
+<pre><code>def frontendImage = 'profile-frontend'
+def backendImage = 'profile-backend'
+def dockerHubUsername = 'vislavathpavani5123'</code></pre>
+
+<p>These variables store values that are reused throughout the pipeline.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>frontendImage</code></td>
+      <td>Stores the local frontend Docker image name.</td>
+    </tr>
+    <tr>
+      <td><code>backendImage</code></td>
+      <td>Stores the local backend Docker image name.</td>
+    </tr>
+    <tr>
+      <td><code>dockerHubUsername</code></td>
+      <td>Stores the Docker Hub namespace used when tagging images for publishing.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>For example, instead of repeatedly writing <code>profile-frontend</code>, the pipeline can refer to <code>frontendImage</code>.</p>
+
+<p>This makes the code easier to maintain.</p>
+
+<h3>22.7 Understanding Application URLs</h3>
+
+<p>The pipeline defines the frontend and backend endpoints:</p>
+
+<pre><code>def frontendUrl = 'http://localhost:3000'
+def backendUrl = 'http://localhost:8000/profile'</code></pre>
+
+<p>These URLs are used later during the health-check stage.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Endpoint</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>http://localhost:3000</code></td>
+      <td>Checks whether the frontend responds.</td>
+    </tr>
+    <tr>
+      <td><code>http://localhost:8000/profile</code></td>
+      <td>Checks whether the backend profile endpoint responds.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Here, <code>localhost</code> refers to the machine running the pipeline commands.</p>
+
+<p>These endpoints work only when the application containers expose the corresponding ports to that machine.</p>
+
+<h3>22.8 Understanding Container Names</h3>
+
+<p>The pipeline also defines the frontend and backend container names:</p>
+
+<pre><code>def frontendContainer =
+    'profileapp_dev_feature_builddeploy-profile-frontend-1'
+
+def backendContainer =
+    'profileapp_dev_feature_builddeploy-profile-backend-1'</code></pre>
+
+<p>These names are used later when collecting container logs.</p>
+
+<p>For example, the pipeline can use:</p>
+
+<pre><code>docker logs &lt;container-name&gt;</code></pre>
+
+<p>Docker identifies the container using its name and returns its logs.</p>
+
+<p><strong>Important:</strong> These container names depend on the Docker Compose project and service naming configuration. If the project name or service names change, the hardcoded names may no longer match the actual containers.</p>
+
+<h3>22.9 Understanding currentBuild.displayName</h3>
+
+<p>The pipeline assigns a display name to the current Jenkins build:</p>
+
+<pre><code>currentBuild.displayName = "Build-${BUILD_NUMBER}"</code></pre>
+
+<p><strong>What is currentBuild?</strong></p>
+
+<p><code>currentBuild</code> is a Jenkins pipeline object that provides information about the currently executing build.</p>
+
+<p><strong>What is displayName?</strong></p>
+
+<p>It is a customizable name displayed for the build in Jenkins.</p>
+
+<p>For example, if the build number is 5, the display name becomes:</p>
+
+<pre><code>Build-5</code></pre>
+
+<p>The actual Jenkins build number remains unchanged. This only changes how the build is displayed.</p>
+
+<h3>22.10 Understanding deleteDir()</h3>
+
+<p>Before checking out the application source code, the pipeline executes:</p>
+
+<pre><code>deleteDir()</code></pre>
+
+<p>This step deletes the contents of the current Jenkins workspace.</p>
+
+<p><strong>Why do we need it?</strong></p>
+
+<p>Suppose Build 1 checked out the application and generated temporary files. Build 2 may reuse the same workspace.</p>
+
+<p>Without cleaning, files left behind by the earlier build could affect the next execution.</p>
+
+<p>By using <code>deleteDir()</code>, the pipeline starts with a clean workspace before checking out the application again.</p>
+
+<p><strong>Remember:</strong> <code>deleteDir()</code> cleans the Jenkins workspace. It does not remove Docker containers, images, or volumes.</p>
+
+<h3>22.11 Understanding the Docker Availability Check</h3>
+
+<p>Before building application images, the pipeline verifies Docker availability using:</p>
+
+<pre><code>docker info</code></pre>
+
+<p>This command communicates with the Docker daemon and displays information about the Docker environment.</p>
+
+<p>If Docker is running and accessible, Jenkins receives Docker information.</p>
+
+<p>If Docker is not accessible, the command returns a non-zero exit status and the pipeline command fails.</p>
+
+<p><strong>Why is this check important?</strong></p>
+
+<ul>
+  <li>Confirms that the Docker CLI can communicate with the Docker daemon.</li>
+  <li>Identifies Docker connectivity problems before the image-building stages.</li>
+  <li>Helps distinguish Docker environment issues from application build issues.</li>
+</ul>
+
+<h3>22.12 Execution Flow Covered So Far</h3>
+
+<pre><code>BuildDeployPipeline()
+        |
+        v
+Set 20-Minute Timeout
+        |
+        v
+Enable Timestamps
+        |
+        v
+Allocate Jenkins Node
+        |
+        v
+Define Image Names
+        |
+        v
+Define Docker Hub Username
+        |
+        v
+Define Application URLs
+        |
+        v
+Define Container Names
+        |
+        v
+Set Build Display Name
+        |
+        v
+Clean Jenkins Workspace
+        |
+        v
+Check Docker Availability
+        |
+        v
+Continue to Git Checkout</code></pre>
+
+<p><strong>Key takeaway:</strong> These initial operations prepare the Jenkins execution environment before any application code is downloaded or Docker image is built.</p>
