@@ -1295,3 +1295,329 @@ Execute CI/CD Stages</code></pre>
 <p>Using <code>deleteDir()</code> helps ensure that the next checkout starts with a clean workspace.</p>
 
 <p><strong>Important:</strong> Workspace cleanup removes files from the Jenkins workspace. It does not automatically delete Docker images, Docker containers, or data stored elsewhere on the machine.</p>
+
+
+<h2>18. Installing and Configuring Jenkins Plugins</h2>
+
+<p>Jenkins plugins extend the functionality of Jenkins. They allow Jenkins to integrate with external tools and services such as GitHub, Docker, and email servers.</p>
+
+<p>In this project, plugins are required for source code management, pipeline execution, Shared Library integration, and build notifications.</p>
+
+<h3>18.1 What Is a Jenkins Plugin?</h3>
+
+<p>A Jenkins plugin is an extension that adds additional functionality to the Jenkins platform.</p>
+
+<p>For example:</p>
+
+<ul>
+  <li>The Git plugin allows Jenkins to retrieve source code from Git repositories.</li>
+  <li>The Pipeline plugin provides support for defining and executing CI/CD pipelines.</li>
+  <li>The Email Extension plugin provides advanced email notification capabilities.</li>
+</ul>
+
+<p>Without the required plugins, some pipeline steps or integrations may not be available.</p>
+
+<h3>18.2 Plugins Required for This Project</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Plugin</th>
+      <th>Purpose</th>
+      <th>Project Usage</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Pipeline</td>
+      <td>Provides Jenkins Pipeline functionality.</td>
+      <td>Executes the pipeline and its stages.</td>
+    </tr>
+    <tr>
+      <td>Git</td>
+      <td>Integrates Git with Jenkins.</td>
+      <td>Checks out the Profile_App repository.</td>
+    </tr>
+    <tr>
+      <td>Pipeline: Groovy</td>
+      <td>Provides Groovy support for pipeline scripts.</td>
+      <td>Supports Groovy-based pipeline implementation.</td>
+    </tr>
+    <tr>
+      <td>GitHub</td>
+      <td>Provides GitHub integration.</td>
+      <td>Useful for GitHub webhook and job integrations, depending on the trigger configuration.</td>
+    </tr>
+    <tr>
+      <td>Credentials</td>
+      <td>Stores and manages sensitive information.</td>
+      <td>Stores GitHub and Docker Hub credentials.</td>
+    </tr>
+    <tr>
+      <td>Credentials Binding</td>
+      <td>Exposes credentials securely to pipeline steps.</td>
+      <td>Provides Docker Hub username and password variables inside the pipeline.</td>
+    </tr>
+    <tr>
+      <td>GitHub Branch Source</td>
+      <td>Provides GitHub organization and multibranch pipeline integrations.</td>
+      <td>Required only if using the corresponding GitHub multibranch functionality.</td>
+    </tr>
+    <tr>
+      <td>Email Extension</td>
+      <td>Provides advanced email notifications.</td>
+      <td>Supports the <code>emailext</code> notification step.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Note:</strong> Plugin requirements depend on the Jenkins job type and implementation. For example, a regular Pipeline job using a Git checkout does not necessarily require GitHub Branch Source. The pipeline uses the Docker CLI directly, so a Docker-specific Jenkins plugin is not automatically required.</p>
+
+<h3>18.3 How to Install Plugins</h3>
+
+<ol>
+  <li>Open the Jenkins dashboard.</li>
+  <li>Navigate to <strong>Manage Jenkins</strong>.</li>
+  <li>Open <strong>Plugins</strong> or <strong>Manage Plugins</strong>, depending on your Jenkins version.</li>
+  <li>Open the Available plugins section.</li>
+  <li>Search for the required plugin.</li>
+  <li>Select the plugin.</li>
+  <li>Click Install.</li>
+  <li>Wait until the installation finishes.</li>
+</ol>
+
+<p>Some plugins may require Jenkins to restart before their functionality becomes available.</p>
+
+<h3>18.4 Understanding the Email Extension Plugin</h3>
+
+<p>The project uses the following pipeline step:</p>
+
+<pre><code>emailext(
+    subject: "Profile App Build - ${currentBuild.currentResult}",
+    body: "...",
+    to: "vislavathpavani5123@gmail.com"
+)</code></pre>
+
+<p>The <code>emailext</code> step is provided by the Email Extension plugin.</p>
+
+<p>It allows Jenkins to send customized emails containing information such as:</p>
+
+<ul>
+  <li>Job name.</li>
+  <li>Build number.</li>
+  <li>Build status.</li>
+  <li>Build URL.</li>
+</ul>
+
+<p>Installing the plugin alone is not enough. Jenkins must also be configured with a working SMTP server to send emails.</p>
+
+<h3>18.5 Verify Installed Plugins</h3>
+
+<p>Navigate to:</p>
+
+<pre><code>Manage Jenkins → Plugins → Installed plugins</code></pre>
+
+<p>Check whether the required plugins are installed and enabled.</p>
+
+<p><strong>Key takeaway:</strong> Plugins provide the integrations and capabilities required by Jenkins. Always verify plugin availability when a pipeline reports that a particular step or integration is missing.</p>
+
+<hr/>
+
+<h2>19. Configuring Jenkins Credentials</h2>
+
+<p>Credentials are sensitive authentication details that Jenkins uses to communicate securely with external systems.</p>
+
+<p>This project requires credentials for GitHub repository access and Docker Hub authentication.</p>
+
+<h3>19.1 Why Do We Need Jenkins Credentials?</h3>
+
+<p>Consider the following operations:</p>
+
+<ul>
+  <li>Jenkins needs access to the GitHub repository to download application source code.</li>
+  <li>Jenkins needs to authenticate with Docker Hub before pushing container images.</li>
+</ul>
+
+<p>Instead of writing usernames, passwords, or access tokens directly inside the pipeline script, we store them in Jenkins Credentials.</p>
+
+<p>This is a safer and more maintainable approach.</p>
+
+<h3>19.2 Open Jenkins Credentials</h3>
+
+<ol>
+  <li>Open the Jenkins dashboard.</li>
+  <li>Navigate to <strong>Manage Jenkins</strong>.</li>
+  <li>Open <strong>Credentials</strong>.</li>
+  <li>Select the appropriate credentials store and domain.</li>
+  <li>Click <strong>Add Credentials</strong>.</li>
+</ol>
+
+<p>For a simple project, the Global credentials domain is commonly used.</p>
+
+<h3>19.3 GitHub Credentials</h3>
+
+<p>The shared pipeline uses the credential ID:</p>
+
+<pre><code>github-cred</code></pre>
+
+<p>This credential is referenced in the application checkout configuration:</p>
+
+<pre><code>checkout([
+    $class: 'GitSCM',
+    branches: [[name: '*/main']],
+    userRemoteConfigs: [[
+        url: 'https://github.com/12pavani/Profile_App.git',
+        credentialsId: 'github-cred'
+    ]]
+])</code></pre>
+
+<p><strong>What does credentialsId mean?</strong></p>
+
+<p>The <code>credentialsId</code> tells Jenkins which stored credential to use when accessing the repository.</p>
+
+<p>It does not contain the actual password or token. It is only a reference to a credential stored in Jenkins.</p>
+
+<h4>Creating the GitHub credential</h4>
+
+<ol>
+  <li>Click Add Credentials.</li>
+  <li>Select the appropriate credential type, commonly Username with password for HTTPS Git authentication.</li>
+  <li>Enter your GitHub username.</li>
+  <li>Enter a suitable GitHub Personal Access Token if authentication is required.</li>
+  <li>Set the ID to <code>github-cred</code>.</li>
+  <li>Provide a description, such as <code>GitHub repository access</code>.</li>
+  <li>Save the credential.</li>
+</ol>
+
+<p>For a public repository, anonymous read access may be sufficient. In that case, the checkout can often be configured without a credential. For a private repository, Jenkins needs an appropriate credential with repository read access.</p>
+
+<h3>19.4 Docker Hub Credentials</h3>
+
+<p>The pipeline also requires Docker Hub authentication to push the generated images.</p>
+
+<p>The credential ID used in the shared pipeline is:</p>
+
+<pre><code>dockerhub-cred</code></pre>
+
+<p>This credential is referenced using Jenkins' <code>withCredentials</code> functionality.</p>
+
+<p>The pipeline code follows this pattern:</p>
+
+<pre><code>withCredentials([
+    usernamePassword(
+        credentialsId: 'dockerhub-cred',
+        usernameVariable: 'USERNAME',
+        passwordVariable: 'PASSWORD'
+    )
+]) {
+    sh '''
+        echo "$PASSWORD" |
+        docker login -u "$USERNAME" --password-stdin
+    '''
+}</code></pre>
+
+<h3>19.5 Understanding the withCredentials Block</h3>
+
+<p>The <code>withCredentials</code> step temporarily makes the stored credential available to the enclosed pipeline steps.</p>
+
+<p>In this example, two environment variables are created:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Contains</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>USERNAME</td>
+      <td>Docker Hub username.</td>
+    </tr>
+    <tr>
+      <td>PASSWORD</td>
+      <td>Docker Hub Personal Access Token.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>These variables are available inside the <code>withCredentials</code> block.</p>
+
+<h3>19.6 Why Use --password-stdin?</h3>
+
+<p>Docker supports authentication through the <code>docker login</code> command.</p>
+
+<p>A common but less secure approach is to provide the password directly as a command-line argument.</p>
+
+<p>Instead, this project uses:</p>
+
+<pre><code>echo "$PASSWORD" | docker login -u "$USERNAME" --password-stdin</code></pre>
+
+<p>Let's understand the command:</p>
+
+<ul>
+  <li><code>echo "$PASSWORD"</code> writes the token to standard output.</li>
+  <li><code>|</code> is a pipe operator that passes the output of one command to another command.</li>
+  <li><code>docker login</code> starts Docker authentication.</li>
+  <li><code>-u "$USERNAME"</code> specifies the Docker Hub username.</li>
+  <li><code>--password-stdin</code> tells Docker to read the password or token from standard input.</li>
+</ul>
+
+<p>This avoids putting the token directly in the command-line arguments.</p>
+
+<h3>19.7 Create the Docker Hub Credential</h3>
+
+<ol>
+  <li>Log in to your Docker Hub account.</li>
+  <li>Open your account's security or access-token settings.</li>
+  <li>Create a new Personal Access Token.</li>
+  <li>Give it an appropriate name, such as <code>jenkins-profile-app</code>.</li>
+  <li>Grant the permissions required to push images, including Read and Write access.</li>
+  <li>Copy the token securely when it is displayed.</li>
+  <li>Return to Jenkins and open Add Credentials.</li>
+  <li>Select <strong>Username with password</strong>.</li>
+  <li>Enter your Docker Hub username.</li>
+  <li>Paste the Personal Access Token into the password field.</li>
+  <li>Set the credential ID to <code>dockerhub-cred</code>.</li>
+  <li>Save the credential.</li>
+</ol>
+
+<p><strong>Important:</strong> A Docker Hub Personal Access Token may expire. If it expires, Jenkins authentication will fail even if the username is correct. Generate a replacement token and update the existing Jenkins credential.</p>
+
+<h3>19.8 Difference Between GitHub and Docker Hub Credentials</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Credential ID</th>
+      <th>Service</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>github-cred</code></td>
+      <td>GitHub</td>
+      <td>Allows Jenkins to access the application repository when authentication is required.</td>
+    </tr>
+    <tr>
+      <td><code>dockerhub-cred</code></td>
+      <td>Docker Hub</td>
+      <td>Allows Jenkins to authenticate and push Docker images.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>19.9 Security Best Practices</h3>
+
+<ul>
+  <li>Never hardcode passwords or access tokens in Jenkinsfiles or Groovy source files.</li>
+  <li>Never upload Jenkins credentials to GitHub.</li>
+  <li>Use tokens with only the permissions required by the pipeline.</li>
+  <li>Rotate tokens periodically and replace expired tokens.</li>
+  <li>Restrict access to Jenkins credentials to authorized users.</li>
+  <li>Avoid printing secret variables using <code>echo</code> or other debugging commands.</li>
+  <li>Use Jenkins credential IDs in pipeline scripts rather than storing secret values in source code.</li>
+</ul>
+
+<p><strong>Key takeaway:</strong> Jenkins Credentials provide a centralized way to manage sensitive information. The pipeline references credentials by ID and retrieves their values only when required.</p>
