@@ -696,3 +696,294 @@ docker compose up -d</code></pre>
 </table>
 
 <p><strong>Key takeaway:</strong> Jenkins does not automatically receive Docker access simply because Docker Desktop is installed on the machine. The Jenkins process must be able to locate the Docker CLI and communicate with the Docker daemon.</p>
+
+
+<h2>12. Understanding the GitHub Repositories</h2>
+
+<p>This project is maintained using two separate GitHub repositories. Separating application code from pipeline automation makes the project easier to maintain and allows the same pipeline logic to be reused for other applications.</p>
+
+<h3>12.1 Repository 1: Jenkins Shared Library</h3>
+
+<p><strong>Repository name:</strong> jenkins-gsl-profileApp</p>
+
+<p><strong>GitHub URL:</strong> <a href="https://github.com/12pavani/jenkins-gsl-profileApp">https://github.com/12pavani/jenkins-gsl-profileApp</a></p>
+
+<p>This repository contains the reusable Jenkins pipeline implementation written in Groovy.</p>
+
+<p>Instead of writing the entire CI/CD pipeline inside every application's Jenkinsfile, we maintain the main pipeline logic in this repository.</p>
+
+<p>The repository currently has the following top-level structure:</p>
+
+<pre><code>jenkins-gsl-profileApp/
+|
++-- src/
+|   |
+|   +-- com/
+|       |
+|       +-- pavani/
+|           |
+|           +-- pipeline/
+|
++-- vars/</code></pre>
+
+<p><strong>Understanding the folders:</strong></p>
+
+<h4>src/</h4>
+
+<p>The <code>src</code> directory contains Groovy source code organized using Java-style package naming conventions.</p>
+
+<p>In this project, the pipeline code uses the package:</p>
+
+<pre><code>package com.pavani.pipeline</code></pre>
+
+<p>The <code>src/com/pavani/pipeline</code> directory is therefore associated with the <code>com.pavani.pipeline</code> package.</p>
+
+<p>The shared library method <code>BuildDeployPipeline()</code> contains the implementation of the application's build and deployment workflow.</p>
+
+<h4>vars/</h4>
+
+<p>The <code>vars</code> directory is used by Jenkins Shared Libraries to expose reusable pipeline steps and global variables.</p>
+
+<p>For example, a Groovy file inside this directory can define a custom pipeline step that a Jenkinsfile can invoke.</p>
+
+<p>The exact filenames and method wrappers in this project's <code>vars</code> directory should be checked against the repository before documenting their individual responsibilities.</p>
+
+<h3>12.2 Repository 2: Profile Application</h3>
+
+<p><strong>Repository name:</strong> Profile_App</p>
+
+<p><strong>GitHub URL:</strong> <a href="https://github.com/12pavani/Profile_App">https://github.com/12pavani/Profile_App</a></p>
+
+<p>This repository contains the actual application that the Jenkins pipeline builds and deploys.</p>
+
+<p>The repository currently has the following top-level structure:</p>
+
+<pre><code>Profile_App/
+|
++-- backend/
+|
++-- frontend/
+|
++-- node_modules/
+|
++-- .DS_Store
+|
++-- docker-compose.yaml
+|
++-- package.json
+|
++-- package-lock.json</code></pre>
+
+<p><strong>Understanding the folders and files:</strong></p>
+
+<h4>frontend/</h4>
+
+<p>This directory contains the frontend application.</p>
+
+<p>The frontend is packaged into a Docker image using the following command in the shared library:</p>
+
+<pre><code>docker build -t profile-frontend:${BUILD_NUMBER} frontend</code></pre>
+
+<p>Here:</p>
+
+<ul>
+  <li><code>docker build</code> instructs Docker to build an image.</li>
+  <li><code>-t</code> assigns a name and tag to the image.</li>
+  <li><code>profile-frontend</code> is the image name.</li>
+  <li><code>${BUILD_NUMBER}</code> is the Jenkins build number.</li>
+  <li><code>frontend</code> is the build context directory containing the frontend's Docker build files and application source.</li>
+</ul>
+
+<h4>backend/</h4>
+
+<p>This directory contains the backend application.</p>
+
+<p>The backend is packaged into a separate Docker image:</p>
+
+<pre><code>docker build -t profile-backend:${BUILD_NUMBER} backend</code></pre>
+
+<p>The frontend and backend are built separately because they are independent application components and run as separate containers.</p>
+
+<h4>docker-compose.yaml</h4>
+
+<p>This file defines how the frontend and backend containers are configured and run together.</p>
+
+<p>Docker Compose reads this YAML file to understand the application services and their runtime configuration.</p>
+
+<p>In this project, Jenkins uses:</p>
+
+<pre><code>docker compose -f docker-compose.yaml up -d</code></pre>
+
+<p>Breaking down the command:</p>
+
+<ul>
+  <li><code>docker compose</code> invokes Docker Compose.</li>
+  <li><code>-f docker-compose.yaml</code> specifies the Compose configuration file.</li>
+  <li><code>up</code> creates and starts the configured services.</li>
+  <li><code>-d</code> runs the containers in detached mode, meaning they continue running in the background.</li>
+</ul>
+
+<p>The pipeline also executes <code>docker compose down</code> before starting the services again.</p>
+
+<h4>package.json</h4>
+
+<p>This is a Node.js project configuration file. It commonly contains application metadata, scripts, and dependency declarations.</p>
+
+<p>For example, Node.js applications may define commands for starting the application, running tests, or installing dependencies in this file.</p>
+
+<h4>package-lock.json</h4>
+
+<p>This file records the resolved dependency versions for an npm project. It helps maintain consistent dependency installation across environments.</p>
+
+<h4>node_modules/</h4>
+
+<p>This directory contains installed Node.js packages.</p>
+
+<p>It is generally better not to commit <code>node_modules</code> to GitHub. Dependencies should normally be installed from the package manifests using npm, and the directory should be excluded through <code>.gitignore</code>.</p>
+
+<p>For a production-ready repository, review whether this directory should be removed from version control.</p>
+
+<h4>.DS_Store</h4>
+
+<p>This is a macOS-generated metadata file used by Finder to store folder display settings.</p>
+
+<p>It is not required to build or deploy the application. It is generally excluded from Git repositories using <code>.gitignore</code>.</p>
+
+<hr/>
+
+<h2>13. How Both Repositories Work Together</h2>
+
+<p>Now that we understand the two repositories, let's understand how Jenkins uses them during a build.</p>
+
+<h3>13.1 The Relationship Between the Repositories</h3>
+
+<pre><code>       GITHUB
+          |
+          |
+     +----+---------------------+
+     |                          |
+     v                          v
++----------------------+  +----------------------+
+| Jenkins Shared       |  | Profile Application  |
+| Library Repository   |  | Repository            |
+|                      |  |                      |
+| Groovy pipeline code |  | frontend/            |
+| src/                 |  | backend/             |
+| vars/                |  | docker-compose.yaml  |
++----------+-----------+  +----------+-----------+
+           |                         |
+           |                         |
+           v                         |
++------------------------------------+
+|               JENKINS             |
+|                                    |
+| Loads Shared Library              |
+| Executes BuildDeployPipeline()    |
+|                                    |
+| Checks out Profile_App source code|
+|                                    |
+| Builds frontend and backend       |
+| Docker images                     |
+|                                    |
+| Pushes images to Docker Hub        |
+|                                    |
+| Deploys using Docker Compose       |
++------------------+-----------------+
+                   |
+                   v
+             DOCKER DESKTOP
+                   |
+          +--------+--------+
+          |                 |
+          v                 v
+   +-------------+   +-------------+
+   |  Frontend   |   |   Backend   |
+   |  Container  |   |  Container  |
+   +-------------+   +-------------+</code></pre>
+
+<h3>13.2 What Happens During Pipeline Execution?</h3>
+
+<ol>
+  <li><strong>Shared Library loading:</strong> Jenkins loads the configured Shared Library repository so that its reusable Groovy pipeline code is available to the Jenkins job.</li>
+  <li><strong>Pipeline invocation:</strong> The Jenkinsfile or another pipeline entry point invokes the shared pipeline method.</li>
+  <li><strong>Application checkout:</strong> The shared pipeline checks out the Profile_App repository using the Git checkout configuration.</li>
+  <li><strong>Source code availability:</strong> Jenkins now has the frontend and backend source code in its workspace.</li>
+  <li><strong>Docker image building:</strong> Jenkins builds separate Docker images for the frontend and backend.</li>
+  <li><strong>Image publishing:</strong> Jenkins authenticates with Docker Hub and pushes the tagged images.</li>
+  <li><strong>Application deployment:</strong> Docker Compose starts the frontend and backend containers.</li>
+  <li><strong>Health verification:</strong> Jenkins checks whether the application endpoints respond successfully.</li>
+</ol>
+
+<h3>13.3 Important Concept: Shared Library Checkout vs Application Checkout</h3>
+
+<p>These are two different operations and should not be confused.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Operation</th>
+      <th>Repository</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Shared Library loading</td>
+      <td>jenkins-gsl-profileApp</td>
+      <td>Makes reusable Groovy pipeline logic available to Jenkins.</td>
+    </tr>
+    <tr>
+      <td>Application checkout</td>
+      <td>Profile_App</td>
+      <td>Downloads the actual application source code into the Jenkins workspace.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>The shared library is loaded through Jenkins Shared Library configuration or a library annotation. The application source is checked out by the <code>checkout</code> step inside the shared pipeline.</p>
+
+<p>In this project, the application checkout uses:</p>
+
+<pre><code>checkout([
+    $class: 'GitSCM',
+    branches: [[name: '*/main']],
+    userRemoteConfigs: [[
+        url: 'https://github.com/12pavani/Profile_App.git',
+        credentialsId: 'github-cred'
+    ]]
+])</code></pre>
+
+<p>This tells Jenkins to retrieve the application source from the <code>main</code> branch.</p>
+
+<p><strong>Remember:</strong> Loading the Shared Library does not automatically check out the application repository into the job workspace. These are separate operations.</p>
+
+<hr/>
+
+<h2>14. Why Use a Jenkins Shared Library?</h2>
+
+<p>Before configuring the pipeline, it is important to understand why the project uses a Shared Library instead of keeping all pipeline logic inside a Jenkinsfile.</p>
+
+<h3>14.1 Without a Shared Library</h3>
+
+<p>Imagine that an organization maintains five applications. Each application has its own Jenkinsfile containing the same build, Docker login, image push, deployment, and notification logic.</p>
+
+<p>If the Docker login process needs to change, the team may need to update five different Jenkinsfiles.</p>
+
+<h3>14.2 With a Shared Library</h3>
+
+<p>Instead, common pipeline logic can be maintained in one reusable repository.</p>
+
+<p>Each application pipeline can load the Shared Library and invoke the required functionality.</p>
+
+<h3>14.3 Main Advantages</h3>
+
+<ul>
+  <li><strong>Reusability:</strong> The same pipeline logic can be used across multiple application repositories.</li>
+  <li><strong>Maintainability:</strong> Common changes can be made centrally.</li>
+  <li><strong>Consistency:</strong> Applications can follow a common build and deployment process.</li>
+  <li><strong>Reduced duplication:</strong> Developers do not need to copy large pipeline scripts into every repository.</li>
+  <li><strong>Separation of concerns:</strong> Application source code and CI/CD automation logic are maintained independently.</li>
+</ul>
+
+<p><strong>Interview point:</strong> A Jenkins Shared Library is a reusable collection of Groovy code that allows teams to centralize and share pipeline logic across multiple Jenkins jobs.</p>
+
